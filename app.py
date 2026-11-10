@@ -245,6 +245,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
             col_phone = next((c for c in df_drivers.columns if any(k in c.lower() for k in ['phone', 'mobile', 'celular', 'whatsapp', 'contato', 'telefone'])), None)
 
+            # Coluna oficial de veículo
+            col_veh_name = next((c for c in df_drivers.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
+
             df_ativos = df_drivers[df_drivers[col_status] == 'Active'].copy()
             df_ativos['ID_LIMPO'] = df_ativos[col_driver_id].apply(converter_id_cientifico)
 
@@ -314,9 +317,8 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
             df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
 
-            # Garantir extração exata do tipo de veículo da coluna oficial
-            col_veh_name = next((c for c in df_drivers.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
-            veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).unique()))) if col_veh_name in df_analise.columns else []
+            # Extração dos tipos de veículos únicos para o filtro dropdown
+            veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique()))) if col_veh_name in df_analise.columns else []
             veiculos_options_html = '<option value="TODOS">🚗 Veículo: Todos</option>' + "".join([f'<option value="{v}">{v}</option>' for v in veiculos_unicos if v and v.lower() != 'nan'])
 
             total = len(df_analise)
@@ -329,7 +331,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             for _, r in df_analise.iterrows():
                 d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
                 d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
-                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '')
+                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '').strip()
                 d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
                 d_dias_at = r['Dias_Sem_AT_Fmt']
                 d_status = r['Status_Inatividade']
@@ -468,7 +470,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             <!-- CONTAINER DA TABELA -->
             <div class="table-container">
                 
-                <!-- CABEÇALHO DO BLOCO COM TÍTULO E CAMPO DE BUSCA -->
+                <!-- CABEÇALHO DO BLOCO COM TÍTULO E CAMPO DE BUSCA DE TEXTO -->
                 <div class="header-bar">
                     <div class="section-title">📋 Detalhamento da Base de Motoristas</div>
                     <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 280px;">
@@ -546,18 +548,22 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 function aplicarFiltros() {{
                     let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
                     let diasVal = document.getElementById('diasFilter').value;
-                    let vehVal = document.getElementById('veiculoFilter').value;
+                    let vehVal = document.getElementById('veiculoFilter').value.toUpperCase().trim();
                     let rows = document.querySelectorAll('#driversTable tbody tr');
 
                     rows.forEach(row => {{
                         let rowStatus = row.getAttribute('data-status');
                         let rowDias = parseInt(row.getAttribute('data-dias'));
-                        let rowVeh = row.getAttribute('data-veh');
+                        let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
                         let rowText = row.textContent.toLowerCase();
 
+                        // 1. Filtro Card KPI / Status
                         let matchCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
+                        
+                        // 2. Filtro Busca Texto Geral
                         let matchText = (searchText === '') || rowText.includes(searchText);
 
+                        // 3. Filtro Dias Sem AT
                         let matchDias = true;
                         if (diasVal === '0-7') matchDias = (rowDias >= 0 && rowDias <= 7);
                         else if (diasVal === '8-15') matchDias = (rowDias >= 8 && rowDias <= 15);
@@ -565,6 +571,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         else if (diasVal === '21+') matchDias = (rowDias > 20 && rowDias < 9999);
                         else if (diasVal === 'SEM') matchDias = (rowDias === 9999);
 
+                        // 4. Filtro Tipo de Veículo (CASE-INSENSITIVE + TRIM)
                         let matchVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
 
                         if (matchCard && matchText && matchDias && matchVeh) {{
@@ -671,7 +678,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         return;
                     }}
 
-                    let textoFinal = lista.join('\n');
+                    let textoFinal = lista.join('\\n');
                     copiarParaClipboard(textoFinal).then(() => {{
                         alert('✅ ' + lista.length + ' ' + (tipo === 'id' ? 'IDs' : 'Nomes') + ' copiados para a área de transferência!');
                     }}).catch(err => alert('Erro ao copiar lista!'));
@@ -695,7 +702,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         return;
                     }}
 
-                    let textoFinal = lista.join('\n');
+                    let textoFinal = lista.join('\\n');
                     copiarParaClipboard(textoFinal).then(() => {{
                         alert('✅ ' + lista.length + ' motoristas selecionados copiados para a área de transferência!');
                     }}).catch(err => alert('Erro ao copiar selecionados!'));
