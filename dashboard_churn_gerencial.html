@@ -1,0 +1,4638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Gerencial - Inatividade de Motoristas (> 20 dias)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .header-title { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 25px 0; margin-bottom: 30px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-kpi { border: none; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .card-kpi:hover { transform: translateY(-3px); }
+        .kpi-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; font-weight: 600; }
+        .kpi-value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
+        .table-container { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<div class="header-title text-center">
+    <h2>🚚 Painel Gerencial de Controle de Churn</h2>
+    <p class="mb-0">Motoristas ativos há mais de 20 dias sem rotas atribuídas | Data de Referência: 10/11/2026</p>
+</div>
+
+<div class="container-fluid px-4">
+    <!-- CARDS DE KPIS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card card-kpi p-3 text-center border-start border-primary border-4">
+                <div class="kpi-title">Total Base Ativa</div>
+                <div class="kpi-value text-primary">3,502</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-kpi p-3 text-center border-start border-danger border-4">
+                <div class="kpi-title">Motoristas Inativos (>20d)</div>
+                <div class="kpi-value text-danger">3,502</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-kpi p-3 text-center border-start border-warning border-4">
+                <div class="kpi-title">Taxa de Inatividade</div>
+                <div class="kpi-value text-warning">100.0%</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-kpi p-3 text-center border-start border-secondary border-4">
+                <div class="kpi-title">Sem Nenhuma Rota</div>
+                <div class="kpi-value text-secondary">3,502</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card card-kpi p-3">
+                <h6 class="fw-bold text-secondary mb-3">Distribuição do Tempo de Inatividade</h6>
+                <canvas id="chartFaixas" height="150"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card card-kpi p-3">
+                <h6 class="fw-bold text-secondary mb-3">Proporção: Ativos vs Inativos (>20d)</h6>
+                <canvas id="chartProporcao" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABELA DETALHADA -->
+    <div class="table-container mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0">Lista Detalhada de Motoristas em Churn (>20 dias)</h5>
+            <input type="text" id="searchInput" class="form-control w-25" placeholder="🔍 Buscar por ID, Nome ou Veículo...">
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="driversTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Driver ID</th>
+                        <th>Nome</th>
+                        <th>Veículo</th>
+                        <th>Última Rota</th>
+                        <th>Dias Inativo</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+    <tr>
+        <td><strong>4579469</strong></td>
+        <td>DIEGO OLIVEIRA REIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4579273</strong></td>
+        <td>JONATHAN RODRIGUES SANTANA DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4557721</strong></td>
+        <td>ONILDO JERONYMO MILITAO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3254379</strong></td>
+        <td>ADRIANA DE LIMA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3982953</strong></td>
+        <td>EDUARDO MARQUES NOVAIS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4400209</strong></td>
+        <td>FELIPE DE SOUZA CASEMIRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4138304</strong></td>
+        <td>Letícia Borges Prado</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4053015</strong></td>
+        <td>GLAUBER BITTNER PINTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4053242</strong></td>
+        <td>RAMONIQUE LIMA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4133682</strong></td>
+        <td>THIAGO COSTA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4095769</strong></td>
+        <td>CAMILA CRISTINA PEREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3511307</strong></td>
+        <td>RICARDO SOARES PEREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4575873</strong></td>
+        <td>ANGELO GABRIEL DIAS DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3877874</strong></td>
+        <td>MATHEUS HENRIQUE DA SILVA OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4088761</strong></td>
+        <td>RAFAEL VIDAL MARTINS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4103507</strong></td>
+        <td>MISLENE SOUZA MIRANDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4108190</strong></td>
+        <td>MICHELE SILVA SHIMABUKURO FERNANDES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4093512</strong></td>
+        <td>PAULO DANIEL NASCIMENTO DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4556704</strong></td>
+        <td>Renan Otávio Juarez justo</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3938816</strong></td>
+        <td>MURILO DE OLIVEIRA NABAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4136121</strong></td>
+        <td>GUILHERME DA SILVA LIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4149221</strong></td>
+        <td>DAIANE APARECIDA DOS SANTOS ALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4121869</strong></td>
+        <td>MATHEUS PASSOS OLIVERIO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1505427</strong></td>
+        <td>FRANCISCO DENIS PEREIRA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4076007</strong></td>
+        <td>ROGERIO DA SILVA MENEZES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4131463</strong></td>
+        <td>DANILO RIGOLO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4134886</strong></td>
+        <td>GABRIEL FERREIRA DOS REIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4111799</strong></td>
+        <td>JAQUELINE DA SILVA DIAS GOIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4523921</strong></td>
+        <td>DAVID RODRIGUES CARVALHO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4560518</strong></td>
+        <td>ANDERSON VIEIRA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4143650</strong></td>
+        <td>DIEGO FRANK DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2526468</strong></td>
+        <td>MARCUS DAVID MOURA DE CARVALHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4566578</strong></td>
+        <td>MATEUS SANTOS DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1755147</strong></td>
+        <td>DOUGLAS DE OLIVEIRA CARNEIRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4120455</strong></td>
+        <td>ANDREIA GOMES DE ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2921687</strong></td>
+        <td>BRUNO RODRIGUES MELO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4165223</strong></td>
+        <td>GABRIEL SANTOS NUNES FARIAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4158147</strong></td>
+        <td>JAKELINE SANTOS DE SOUSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4540442</strong></td>
+        <td>EDUARDO GUSTAVO SOUZA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4541710</strong></td>
+        <td>FERNANDA DA SILVA PARENTE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4237312</strong></td>
+        <td>MARCOS FELIPE NASCIMENTO SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4545131</strong></td>
+        <td>MARIANA ROCHA DE QUEIROZ</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1041822</strong></td>
+        <td>WELLINGTON SILVA DA CRUZ</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4557276</strong></td>
+        <td>JONATHAN CHARLES DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4544193</strong></td>
+        <td>CYNTIA SILVA DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4566881</strong></td>
+        <td>JEAN MARCOS DE JESUS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4485911</strong></td>
+        <td>AYONAN MARQUES RIOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4459485</strong></td>
+        <td>PETERSON OLIVEIRA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3849259</strong></td>
+        <td>THAISLAINE CALDAS CANO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4557410</strong></td>
+        <td>EMANOEL GALVAO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4370559</strong></td>
+        <td>REBECA RIBEIRO SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4545694</strong></td>
+        <td>KAUE FLORENCIO DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4560676</strong></td>
+        <td>WILLIAM FERREIRA DIAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4553884</strong></td>
+        <td>ANTONIO LAERTON CALIXTO LOURENCO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4561089</strong></td>
+        <td>ANDREY POGGIATO CAVALCANTE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4411219</strong></td>
+        <td>GUSTAVO DE OLIVEIRA GIANNATTASIO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4280368</strong></td>
+        <td>CLAUDIO CESAR TEODORO DIAS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>441127</strong></td>
+        <td>ANDRE SOARES DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4550706</strong></td>
+        <td>JANAINA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3596996</strong></td>
+        <td>ANDRÉ JOSE DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4549957</strong></td>
+        <td>WELLINGTON MESSIAS DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4553368</strong></td>
+        <td>GILVAM REIS CARVALHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4553915</strong></td>
+        <td>NATALIA AGUIAR FERNANDES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4556059</strong></td>
+        <td>JEFFERSON DE SOUZA BRAGA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3856173</strong></td>
+        <td>CLEUDONILTON DE SOUSA ROCHA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4261895</strong></td>
+        <td>ELIZANGELA MARIA DA SILVA NOVAES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4552715</strong></td>
+        <td>LUCAS GABRIEL DOS SANTOS SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4083285</strong></td>
+        <td>Luana C B Goncalves</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4179508</strong></td>
+        <td>DANIEL ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4541718</strong></td>
+        <td>LEONARDO FELIPE ALMEIDA FAUSTINO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4230046</strong></td>
+        <td>LUCAS FERNANDES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4365850</strong></td>
+        <td>THIAGO RAMIRES LIMA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4196729</strong></td>
+        <td>DENIS SILVA FEITOSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4204226</strong></td>
+        <td>JULIANA APARECIDA DA SILVA POLONIATTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4542437</strong></td>
+        <td>Jonathan dos santos barreto guedes</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4534172</strong></td>
+        <td>CILZO APARECIDO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4535443</strong></td>
+        <td>DAIANE DEDIS TOLENTINO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4489735</strong></td>
+        <td>HELLEN CRISTINA CHAVES DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4202119</strong></td>
+        <td>PAULO ROBERTO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4530210</strong></td>
+        <td>LEANDRO FONSECA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4211532</strong></td>
+        <td>DEBORA RODRIGUES SIQUEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4535519</strong></td>
+        <td>HYGOR DA SILVA TELES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>441758</strong></td>
+        <td>GABRIEL RODRIGUES NEVES LUCAS</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4521281</strong></td>
+        <td>LUCAS RODRIGUES DA CUNHA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4188394</strong></td>
+        <td>LETICIA BUENO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3824630</strong></td>
+        <td>MIRIA DA SILVA GOMES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4206948</strong></td>
+        <td>SANDRO SOUZA CRUVINEL</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3161701</strong></td>
+        <td>VICTOR WANDENBERG BEZERRA DE MORAIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4210289</strong></td>
+        <td>ERIKA ESTEVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4172795</strong></td>
+        <td>TARCYLA MORAES DE ASSIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4218229</strong></td>
+        <td>GILDAZIO RODRIGUES DA CONCEICAO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4102667</strong></td>
+        <td>VANESSA SOUSA DE PAULA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4154934</strong></td>
+        <td>ELIZEU SILVA CABRAL</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4230860</strong></td>
+        <td>PAMELA SANTANA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4484728</strong></td>
+        <td>CLAYTON DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4520681</strong></td>
+        <td>CAIO VINICIUS FLORIDE CARVALHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4464443</strong></td>
+        <td>GEDSON ARAUJO DE ALMEIDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3767631</strong></td>
+        <td>EDUARDO DANTAS DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4485177</strong></td>
+        <td>VANDERSON ANJOS DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4523970</strong></td>
+        <td>BARBARA DO CARMO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4490055</strong></td>
+        <td>GUILHERME VIDAL VALENCA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4066863</strong></td>
+        <td>TIAGO DE SOUZA ALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4528743</strong></td>
+        <td>BRUNA DOS SANTOS DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4531605</strong></td>
+        <td>MATEUS SOUZA DE ALMEIDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4518202</strong></td>
+        <td>ALAN MARTINS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4528639</strong></td>
+        <td>MARCOS VINICIUS TOSHIMA PINHEIRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4529638</strong></td>
+        <td>AMANDA SOUZA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4271154</strong></td>
+        <td>GUSTAVO MENEZES DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4531776</strong></td>
+        <td>GUSTAVO FRANCISQUETTI SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4525252</strong></td>
+        <td>Wellington Goncalo</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2920150</strong></td>
+        <td>FELIPE FARIA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4496910</strong></td>
+        <td>DANILO DEDINI GONCALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4497106</strong></td>
+        <td>ABNER IZAQUE DA SILVA COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4531221</strong></td>
+        <td>FILIPE LEANDRO SOUSA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4512522</strong></td>
+        <td>ANDRE SOUZA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4514240</strong></td>
+        <td>JULIO CESAR DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4507876</strong></td>
+        <td>LEANDRO BEZERRA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4167297</strong></td>
+        <td>JEAN PAULINO DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4128825</strong></td>
+        <td>THUANY ERIKA DIOGO NUNES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4207607</strong></td>
+        <td>WILSON FERREIRA MACHADO FILHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4343397</strong></td>
+        <td>EMANUEL VICTOR SANTOS LACERDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4523374</strong></td>
+        <td>FELLYPE GONCALVES FERNANDES RIBEIRO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4186484</strong></td>
+        <td>YURI TONIATTO RODRIGUES DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4522971</strong></td>
+        <td>FELIPE SILVEIRA FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4500889</strong></td>
+        <td>RENATO CESAR ROSSATO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4259623</strong></td>
+        <td>THIAGO MARTINS DE ALMEIDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4525156</strong></td>
+        <td>DOUGLAS GABRIEL ASSIS JARDIM</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4525044</strong></td>
+        <td>CAMILA DE JESUS ROCHA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4525184</strong></td>
+        <td>MAYARA ASSUNCAO CANUTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4493348</strong></td>
+        <td>GABRIEL HENRIQUE MOREIRA FONSECA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4454454</strong></td>
+        <td>GERALDO GONCALVES DOS SANTOS JUNIOR</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4494808</strong></td>
+        <td>NILDO JOSE RIBEIRO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4375235</strong></td>
+        <td>WESLEY DE LIMA NUNES DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4467814</strong></td>
+        <td>DAVID DOS SANTOS ALMEIDA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4503051</strong></td>
+        <td>AGATHA KATY SOUZA FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4453477</strong></td>
+        <td>ALEX ISLA GONCALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4428455</strong></td>
+        <td>JOSE DEYVSON DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4375418</strong></td>
+        <td>PEDRO DOUAY BRANDI MACCHERONI DE QUEIROZ</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4504413</strong></td>
+        <td>RENAN LUCAS RAMOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4499188</strong></td>
+        <td>VICTOR DA COSTA SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4499538</strong></td>
+        <td>LUCAS NISHIHIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4413443</strong></td>
+        <td>DIMITRY WILLIANS MACHADO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4401604</strong></td>
+        <td>PAMELA SANTOS ALVES COLAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4521168</strong></td>
+        <td>FELIPE CANDIDO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4520754</strong></td>
+        <td>LUCAS VINICIUS ALARCON DA COSTA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4487270</strong></td>
+        <td>THOMPSON VASSALHO SALINO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4502068</strong></td>
+        <td>RAFAEL DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4513953</strong></td>
+        <td>DANRLEI DOS SANTOS OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4297300</strong></td>
+        <td>LUCAS FERNANDES COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4259588</strong></td>
+        <td>JANAINA FRANCISCO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3425503</strong></td>
+        <td>LEANDRO LEITE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4517680</strong></td>
+        <td>WILLIAM MARTINS REIS SENA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4518396</strong></td>
+        <td>CRISTIANE GABRIEL SILVA ALVARENGA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4413144</strong></td>
+        <td>ALBA CIBELE TORRES NOGUEIRA DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4516228</strong></td>
+        <td>APARECIDO ESTEFANO LIMA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4516107</strong></td>
+        <td>ADRIANO TEIXEIRA DOS REIS</td>
+        <td>VAN</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4516363</strong></td>
+        <td>JOAO VITOR DE ALBUQUERQUE</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4494232</strong></td>
+        <td>ELISABETH LETICIA DOS SANTOS ARAUJO</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3122756</strong></td>
+        <td>FABRICIO DA CONCEICAO ANTUNES DE LIMA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4511334</strong></td>
+        <td>OSWALDO ALVES DA CRUZ</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4275188</strong></td>
+        <td>JOSE ANDERSON DA CRUZ</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4511905</strong></td>
+        <td>JACQUELINE CARDOSO RODRIGUES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4512159</strong></td>
+        <td>ANDERSON FERNANDES ANZELOTTI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4512349</strong></td>
+        <td>THAIS ANGELICA COELHO KOSO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4320168</strong></td>
+        <td>VICTOR BARROS DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4508660</strong></td>
+        <td>RYAN ENOQUE SOUZA DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4510374</strong></td>
+        <td>LUNO LUIZ DE ARAUJO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4393490</strong></td>
+        <td>GABRIEL VITOR CARVALHO GUASTI FERRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4200544</strong></td>
+        <td>MIQUEIAS CUSTODIO RIBEIRO SANTANA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4419972</strong></td>
+        <td>ROMULO SILVA MEDEIROS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2083884</strong></td>
+        <td>RAFAEL AUGUSTO HENSEL</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4503874</strong></td>
+        <td>LUCAS LONGUI DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4215826</strong></td>
+        <td>EDMAR CABREIRA RODRIGUES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4238066</strong></td>
+        <td>DANILO DE SOUZA E SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3379815</strong></td>
+        <td>RENATO DA SILVA CALSAVARA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4239013</strong></td>
+        <td>KLEBER APARECIDO AMORIM SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4236613</strong></td>
+        <td>EZEQUIEL ROSA BATISTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4230303</strong></td>
+        <td>CARLOS DELMONTES DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4247123</strong></td>
+        <td>DANIELE APARECIDA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2695728</strong></td>
+        <td>KAIQUE MARTINS DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4169344</strong></td>
+        <td>GABRIEL HENRIQUE FURTADO MAIA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4218300</strong></td>
+        <td>PAULO RICARDO VIANA RAPOSO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4208648</strong></td>
+        <td>WILLIAM APARECIDO SANCHEZ FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4253385</strong></td>
+        <td>PEDRO HENRIQUE HERRERA FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4257597</strong></td>
+        <td>FELIPE SOUZA ZANETI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4341465</strong></td>
+        <td>ERICK HENRIQUE DELMUTTI BORGES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3702134</strong></td>
+        <td>ADRIANA SANTANA SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2598841</strong></td>
+        <td>NIKOLAS JORGE RODRIGUES DE SOUZA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4188817</strong></td>
+        <td>AROALDO DOS SANTOS MOREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4465910</strong></td>
+        <td>Renan Lindolpho Duarte Vieira</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4461642</strong></td>
+        <td>FERNANDO AUGUSTO DE ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4076245</strong></td>
+        <td>VITORIA ALEXANDRA OLIVEIRA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4497747</strong></td>
+        <td>GABRIEL CLEMENTE BARBOSA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4425734</strong></td>
+        <td>RAFAEL DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4409773</strong></td>
+        <td>KEITI PEREIRA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4155826</strong></td>
+        <td>BEATRIZ FERNANDA TAFNER MAURI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>280742</strong></td>
+        <td>Alisson Ribeiro Santos da Silva</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4323083</strong></td>
+        <td>MARCIA CRISTINA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4484271</strong></td>
+        <td>DANILO AMARAL DE BARROS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4494119</strong></td>
+        <td>RAFAEL FELIPE DA SILVA DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4072808</strong></td>
+        <td>BEATRIZ ARAUJO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4494096</strong></td>
+        <td>GEDILSON FERNANDES DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4494033</strong></td>
+        <td>MAURO SILVA DE CARVALHO MAGNESI</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4492564</strong></td>
+        <td>RAFAEL DE SENA ARAUJO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4492464</strong></td>
+        <td>DIEGO WESLEY TELES BATISTA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4486602</strong></td>
+        <td>Denis Torres De Souza</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4454197</strong></td>
+        <td>FRANCISCO ALEX VAZ</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4046158</strong></td>
+        <td>GISELE CRISTINA ROCHA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4481723</strong></td>
+        <td>LUCAS FERREIRA DE SOUSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4490690</strong></td>
+        <td>HENRIQUE CECILIO FERREIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4486065</strong></td>
+        <td>ELIEL GUTIERREZ SOUZA LANNA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4454800</strong></td>
+        <td>WANDERLEY RODRIGUES RUIZ</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4482854</strong></td>
+        <td>ANA CLAUDIA DA COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4488711</strong></td>
+        <td>GUILHERME CAIQUE ANTONIO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4452449</strong></td>
+        <td>ANDERSON DOS SANTOS RIBEIRO NEVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4296190</strong></td>
+        <td>Alan Freitas camargo</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4481845</strong></td>
+        <td>THIAGO GONCALVES DE SOUZA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4374653</strong></td>
+        <td>LUAN BRITO DA SILVA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4459612</strong></td>
+        <td>DIEGO DOS SANTOS GOMES DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3341874</strong></td>
+        <td>EVELLY GIRLANE DA CONCEICAO ALVES PEREIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4459206</strong></td>
+        <td>MARCOS GIOVANI DE OLIVEIRA REIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4474564</strong></td>
+        <td>DEISE TEODORO FERREIRA PEDRETI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4279300</strong></td>
+        <td>RONALDO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4281236</strong></td>
+        <td>HENRIQUE DA SILVA COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4475245</strong></td>
+        <td>YASMIM BARBOSA VIEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4461383</strong></td>
+        <td>Francisco Pedro Ferreira da Silva</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4480661</strong></td>
+        <td>HECTOR GABRIEL SANCHEZ LEOTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4381606</strong></td>
+        <td>KAUE LEITE CAIVANO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4481825</strong></td>
+        <td>ANA SABRINA DA CRUZ BARROS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4380736</strong></td>
+        <td>EVERALDO MARCELINO DE MELO JUNIOR</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4481499</strong></td>
+        <td>THUANNY APARECIDA SEBASTIAO LOPES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4483108</strong></td>
+        <td>JULIO RYCHARD CUSTODIO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4462424</strong></td>
+        <td>ALAN BARBOSA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4463628</strong></td>
+        <td>WYLANY GONCALVES TEIXEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4444510</strong></td>
+        <td>ENZO LOPEZ SILVA DE DEUS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4453046</strong></td>
+        <td>Jeniffer ingrid moreno</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3562885</strong></td>
+        <td>DANIEL ABREU DE MELO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4450384</strong></td>
+        <td>ERICK FERNANDO PEREIRA DE SOUSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4456800</strong></td>
+        <td>JOSEPH SANTOS MONTEIRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4464737</strong></td>
+        <td>VINICIUS DE ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4464921</strong></td>
+        <td>RODRIGO ANDREATTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4464632</strong></td>
+        <td>JORGE EDUARDO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4320084</strong></td>
+        <td>JUAN FELLIPE DO NASCIMENTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4412902</strong></td>
+        <td>RAELF FRANCISCO MELGACO DE OLIVEIRA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4470714</strong></td>
+        <td>PAULO RICARDO DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4265018</strong></td>
+        <td>FRANCISCO WENDEMACHER</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4266916</strong></td>
+        <td>HIGOR GARCEZ CORREIA FRANCISCO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4431226</strong></td>
+        <td>LUMA MACHADO DE BRITO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4412033</strong></td>
+        <td>ALEX ROBERTO DA SILVA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4278130</strong></td>
+        <td>REINALDO FELIX IZIDORIO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4120832</strong></td>
+        <td>ROGERIO DE ABREU SANTANA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4465998</strong></td>
+        <td>JUAN ROMA DE SANTANA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4261740</strong></td>
+        <td>GABRIEL CORREIA DE JESUS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4153360</strong></td>
+        <td>JOANDERSON GONCALVES DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4333862</strong></td>
+        <td>JOSE PEDRO GONCALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4045072</strong></td>
+        <td>ADILSON ALVES CIMIN</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4263746</strong></td>
+        <td>ED CARLOS ALCASSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4250759</strong></td>
+        <td>VITOR HUGO DE SOUZA OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3157674</strong></td>
+        <td>RENAN DE MENESES DE LIMA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4238818</strong></td>
+        <td>ISABEL MARIA FERREIRA ALVES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4459439</strong></td>
+        <td>ERIK GOMES TONETO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4271289</strong></td>
+        <td>PEDRO HENRIQUE DOS SANTOS NASCIMENTO VIEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4273837</strong></td>
+        <td>ADONIS DELVAGE FAGUNDES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4266657</strong></td>
+        <td>EDUARDO LUCIANO DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4275365</strong></td>
+        <td>VICTOR SILVA SOARES DOS ANJOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4234421</strong></td>
+        <td>EZIO GONCALVES PEREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4280223</strong></td>
+        <td>VICTOR ELIAS VASCONCELOS OLIVEIRA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4039159</strong></td>
+        <td>GUSTAVO ARAUJO DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4285532</strong></td>
+        <td>SAMUEL BARRETO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4288387</strong></td>
+        <td>DANIELLE CRISTINA CAVALCANTE DE CARVALHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2731229</strong></td>
+        <td>JOYCE SANCHES MARTIN</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4289118</strong></td>
+        <td>LIA AMARAL TAKACS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4278070</strong></td>
+        <td>RENAN NAVARRO GALLIOTE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4300565</strong></td>
+        <td>LARISSA VITORIA CONDI DA COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4285340</strong></td>
+        <td>ANTONIO FAUSTO ANDRADE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4306228</strong></td>
+        <td>ERIKA CRISTINA DEPOLI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4308256</strong></td>
+        <td>EDISLAN OLIVEIRA SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4309953</strong></td>
+        <td>WAGNER ESCALCO DIOGENES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4310338</strong></td>
+        <td>BEATRIZ MENDES RUBIO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4317325</strong></td>
+        <td>GRAZIELA TENORIO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4053641</strong></td>
+        <td>ERIKA RODRIGUES LIMA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2376454</strong></td>
+        <td>Danieli Schirmer Cristovão de Matos</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2478171</strong></td>
+        <td>LUCIANO PEREZ BESPALEC MARTINS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4388196</strong></td>
+        <td>Iolanda Rodrigues da silva</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>589765</strong></td>
+        <td>WELLINGTON JOSE DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4308868</strong></td>
+        <td>NEUMA NERIANE LEITE DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4324840</strong></td>
+        <td>DEIVID OLIVEIRA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4312591</strong></td>
+        <td>ANDERSON FERREIRA DE LIMA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4307662</strong></td>
+        <td>LEONARDO DE SOUZA MADUREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4338697</strong></td>
+        <td>VITOR PEREIRA ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4341698</strong></td>
+        <td>GUILHERME SILVA AFONSO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4371889</strong></td>
+        <td>IVONILDO FELIX DA SILVA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4349060</strong></td>
+        <td>GABRIEL SUNIGA PUGLIA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4275776</strong></td>
+        <td>AMELIA PONCE NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4258428</strong></td>
+        <td>GABRIELA DIAS BARAUNA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4352853</strong></td>
+        <td>VASNI SOLDERA NETO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4356319</strong></td>
+        <td>CAMILA BERTOLINO DE SOUZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4372330</strong></td>
+        <td>WILSON LUIZ MARCONDES DE GODOY</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4440811</strong></td>
+        <td>PAULO ROBERTO PIEDADE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3588705</strong></td>
+        <td>RAFAEL DA LUZ</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4356574</strong></td>
+        <td>MARCIO RODRIGUES DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4356248</strong></td>
+        <td>ANGELO CELIO DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4457399</strong></td>
+        <td>OTACILIO PEREIRA LIMA NETO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4365420</strong></td>
+        <td>BRUNO RIBEIRO DA CONCEICAO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4395956</strong></td>
+        <td>DANIELE PEREIRA DA ROCHA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3889332</strong></td>
+        <td>ALEXANDRE TRASSI</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4456746</strong></td>
+        <td>MATHEUS MOREIRA LEGER STOCCO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4454745</strong></td>
+        <td>JOAO VITOR SOUSA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4455650</strong></td>
+        <td>LEONARDO BATISTA DO NASCIMENTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4414179</strong></td>
+        <td>GUSTAVO CRUZ RANGEL PESTANA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4409281</strong></td>
+        <td>WASHINGTON LUIZ CORDEIRO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4422755</strong></td>
+        <td>ANDRE SOUZA MENEGHETI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4412905</strong></td>
+        <td>NEIDE MARQUES BARBOSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4235713</strong></td>
+        <td>DANIEL DELMONDES BISPO DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4419245</strong></td>
+        <td>VICTOR SALAMONI TEIXEIRA DE ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4086613</strong></td>
+        <td>FRANCISCO BATISTA REIS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4374938</strong></td>
+        <td>GRAZIELA RIBEIRO DOS SANTOS GHEORGHIU</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4428648</strong></td>
+        <td>LUCIANO DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4358085</strong></td>
+        <td>KATIA FERNANDA CHOUZENDE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4012038</strong></td>
+        <td>DANIEL FERREIRA TORRES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4015510</strong></td>
+        <td>TAYLON MIRANDA ARAUJO NIZA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4346253</strong></td>
+        <td>PEDRO GUSTAVO SILVA BARBOSA DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4330207</strong></td>
+        <td>WALLACE WILLIANS DO VALE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4448732</strong></td>
+        <td>YAGO PEREIRA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4436470</strong></td>
+        <td>CAROLINE BATISTA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4436728</strong></td>
+        <td>LARISSA GOMES DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4446424</strong></td>
+        <td>GUILHERME CUNHA TOMAZETI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4427478</strong></td>
+        <td>JOICE SILVERIO MAXIMIANO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4448017</strong></td>
+        <td>CLEYTON FELICIANO MARIA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4411040</strong></td>
+        <td>JOSE JOSELI DOS REIS SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4415827</strong></td>
+        <td>RAIMUNDO EVERTON DA SILVA FEITOSA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4405425</strong></td>
+        <td>GUILHERME LUZ GARRIDO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4016712</strong></td>
+        <td>ETHIENNE ROSA FERREIRA CODOLO</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4433577</strong></td>
+        <td>RAFAEL GIOVANY PEREIRA DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4446688</strong></td>
+        <td>BRUNA PRISCILA DO NASCIMENTO SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4441749</strong></td>
+        <td>KAUE LOPES MORAES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4439323</strong></td>
+        <td>JOCILDO MOREIRA DE CARVALHO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3983381</strong></td>
+        <td>JAILSON DE SOUSA LIMA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1724948</strong></td>
+        <td>ROGERIO SCHERER APARECIDO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4406310</strong></td>
+        <td>ANDERSON DOUGLAS NERES CARDOSO</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1794543</strong></td>
+        <td>CLEITON DE LIMA AGUIAR</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4151665</strong></td>
+        <td>LUCAS LOURENCO COSTA VIEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4412221</strong></td>
+        <td>ANDERSON COSTA DE PAULA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4397586</strong></td>
+        <td>ANDERSON FRANCA DE LIMA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3902099</strong></td>
+        <td>EMERSON SOARES PROFETA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4427132</strong></td>
+        <td>VITOR TEIXEIRA VIEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4420405</strong></td>
+        <td>VANDERLEI CRISTIANO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4408979</strong></td>
+        <td>ADEMAR FERREIRA FREITAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4409270</strong></td>
+        <td>BRANDON LOPES RUFINO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4407081</strong></td>
+        <td>DOUGLAS FERNANDES MENDES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4408327</strong></td>
+        <td>ANDREA REIS TAVARES FREIRE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4404904</strong></td>
+        <td>CAROLINE SANACATO TAVARES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4383346</strong></td>
+        <td>MATEUS ROCHA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4382689</strong></td>
+        <td>WILSON DO CARMO DOMINGUES</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4159280</strong></td>
+        <td>KAUAN CARVALHO BERNARDO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4395435</strong></td>
+        <td>REGINALDO FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4398754</strong></td>
+        <td>PAULA REGINA VILLELA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4417244</strong></td>
+        <td>DANRLEY FIGUEIREDO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4393250</strong></td>
+        <td>ELAINE CRISTINA DA FONSECA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4389745</strong></td>
+        <td>ARIANE VARELA DE ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4139775</strong></td>
+        <td>Thawane bezerra Silva</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4370131</strong></td>
+        <td>FABIO AUGUSTO LOURENCO MARIANO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4163653</strong></td>
+        <td>VITOR DE ALMEIDA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4409043</strong></td>
+        <td>ANDRE LUIS SILENCIO</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4380204</strong></td>
+        <td>LUCAS MARCELO PEREIRA DO CARMO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4400785</strong></td>
+        <td>FRANCISCO LUCAS PEREIRA DE SOUZA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3405068</strong></td>
+        <td>FABIO ALEX PEREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1411135</strong></td>
+        <td>RODRIGO ROCHA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4251961</strong></td>
+        <td>REGINALDO BARBOSA SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4340547</strong></td>
+        <td>MAIARA DOS SANTOS ANDRADE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4354476</strong></td>
+        <td>REGINA HELENA DIAS DE CARVALHO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4365439</strong></td>
+        <td>ADRIANO WELLITON MENDES DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4364672</strong></td>
+        <td>ROSANGELA LAMMENDA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4191723</strong></td>
+        <td>ALEFFI CARLOS DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4405855</strong></td>
+        <td>JESSICA TEIXEIRA INACIO KATAOKA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4394434</strong></td>
+        <td>JUAREZ NASCIMENTO</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4080851</strong></td>
+        <td>BRYAN PEREIRA BARBOSA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3408122</strong></td>
+        <td>FELIPE MELGACO LEITE DE MENEZES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4393901</strong></td>
+        <td>LUCAS CANTARELI</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4397197</strong></td>
+        <td>MATHEUS DA SILVA GILO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4354765</strong></td>
+        <td>JEAN FIGUEIREDO CAVALCANTE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4361227</strong></td>
+        <td>DAYANE SILVA DE LIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4369360</strong></td>
+        <td>Ana Beatriz Duval Souza</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4389855</strong></td>
+        <td>ROBERTO CARLOS DE OLIVEIRA LIMA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4368167</strong></td>
+        <td>ANDRESSA DA SILVA REIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4371757</strong></td>
+        <td>CAMILA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4370259</strong></td>
+        <td>FELIPE RIBEIRO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4325560</strong></td>
+        <td>kaua Mendes bagatin</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4156878</strong></td>
+        <td>ANTONIO SANTOS DE FRANCA JUNIOR</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4384273</strong></td>
+        <td>ROBINSON RIBEIRO HIPOLITO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4383322</strong></td>
+        <td>FELIPE REIS DE JESUS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2701045</strong></td>
+        <td>CAMILA CRISTINE ESTEBAM</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4351434</strong></td>
+        <td>WEVERTON WILSON DE FRANCA CASE</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4317862</strong></td>
+        <td>LEONARDO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3909467</strong></td>
+        <td>RODRIGO LUIS DOS SANTOS OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4365636</strong></td>
+        <td>RAFAEL BERNARDINO DE ARAUJO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3270408</strong></td>
+        <td>GUILHERME ARTUR DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4363144</strong></td>
+        <td>GUSTAVO FERREIRA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4322980</strong></td>
+        <td>JOSE TIAGO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4328600</strong></td>
+        <td>RAFAELA BARBOSA DOS SANTOS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4322209</strong></td>
+        <td>EDIVANDO ALVES DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4331111</strong></td>
+        <td>FLAVIO OLIVEIRA CARNEIRO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4304789</strong></td>
+        <td>EMERSON MORAES DO NASCIMENTO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4155779</strong></td>
+        <td>MARIO LUCIO GAVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4356210</strong></td>
+        <td>JOAO MONTEIRO JUNIOR</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4350845</strong></td>
+        <td>EZEQUIEL VIANA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4349300</strong></td>
+        <td>MARCELO DA SILVA RODRIGUES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4326065</strong></td>
+        <td>KARINA DE OLIVEIRA REIS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4358985</strong></td>
+        <td>VINICIOS MOREIRA ESTEVAM</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4320279</strong></td>
+        <td>LILIAN DA SILVA BARBONE</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4342008</strong></td>
+        <td>MARCUS VINICIUS COSTA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1306481</strong></td>
+        <td>HELIO PEREIRA DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3854759</strong></td>
+        <td>DANILO MARTINS DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4325221</strong></td>
+        <td>JOSUE LOPES DE JESUS JUNIOR</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4337607</strong></td>
+        <td>PEDRO HENRIQUE TAVARES DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4346867</strong></td>
+        <td>FRANKLIN ALVES ALEXANDRINO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4302172</strong></td>
+        <td>Jaqueline Ester Rodrigues Soares</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4337449</strong></td>
+        <td>FRANCISCO CRISTIANO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4339168</strong></td>
+        <td>JONAS APARECIDO GARONE</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4200424</strong></td>
+        <td>CLEBER ELIAS VIANA LIMA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3321977</strong></td>
+        <td>RODRIGO DE SOUZA MEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4000061</strong></td>
+        <td>KELVIN MOREIRA SERAFIM</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3772638</strong></td>
+        <td>LEANDRO MORAES DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4011533</strong></td>
+        <td>ROBERTO VIEIRA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4330170</strong></td>
+        <td>WILLIAM AUGUSTO DOS SANTOS CORREA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4326277</strong></td>
+        <td>CRISTIANO JESUS DE ARAUJO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4325169</strong></td>
+        <td>ROBERTO CESAR MOREIRA FERREIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4120133</strong></td>
+        <td>VINICIUS HENRIQUE LAZARINI</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>1392385</strong></td>
+        <td>MARCELO RODRIGO EVARISTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4316586</strong></td>
+        <td>MARIA EDUARDA RODRIGUES DA SILVA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3885626</strong></td>
+        <td>UILSON SANTANA DE OLIVEIRA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4315585</strong></td>
+        <td>MARCELO ANTONIO VICENTE</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4272008</strong></td>
+        <td>ROBSON LUIZ DOS SANTOS</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4161487</strong></td>
+        <td>EDERSON LUIZ QUIRINO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2720808</strong></td>
+        <td>ISABELLE CARNEVALE GABOARDI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4307772</strong></td>
+        <td>ANDRE ROBERTO DE SOUZA PINTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3363439</strong></td>
+        <td>DAVID BATISTA DA SILVA ARAUJO</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4305283</strong></td>
+        <td>GUILHERME SCHENTH</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2668406</strong></td>
+        <td>LUIS GUSTAVO CARDOSO DE MIRANDA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4281947</strong></td>
+        <td>GUSTAVO SANTOS DO NASCIMENTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4133762</strong></td>
+        <td>JULIANA MOREIRA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4214766</strong></td>
+        <td>JOAO CARLOS DE SOUZA ASSIS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4262534</strong></td>
+        <td>DIEGO HIROMI MARQUES MENEGHINI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4285103</strong></td>
+        <td>GUILHERME DA SILVA ANGELO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4012891</strong></td>
+        <td>KEROLEN CRISTINA SOUZA RODRIGUES</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4172962</strong></td>
+        <td>RODRIGO TADEU MALVEZZI</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4247093</strong></td>
+        <td>FLAVIA EFIGENIA DE OLIVEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4273655</strong></td>
+        <td>ERIVALDO OLIVEIRA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4276386</strong></td>
+        <td>LUIZ FELIPE CRETON EVARISTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4273944</strong></td>
+        <td>CAROLINE MUNIZ DE SOUZA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4273339</strong></td>
+        <td>MATHEUS BEGLIOMINI</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3883721</strong></td>
+        <td>ALISSON ALVES FELIPE</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4249031</strong></td>
+        <td>GUILHERME DA SILVA DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4250255</strong></td>
+        <td>MARCIO SANTOS DA CONCEICAO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4261310</strong></td>
+        <td>RICHARD ROCHA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3779862</strong></td>
+        <td>JOSE CARLOS MARTINS LOPES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4257373</strong></td>
+        <td>RENAN PORTO COSTA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4251388</strong></td>
+        <td>THIAGO CORREA CARVALHO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4222543</strong></td>
+        <td>CESAR DA SILVA GOMES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4194893</strong></td>
+        <td>EZEQUIEL DO NASCIMENTO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3967026</strong></td>
+        <td>GEOVANE DE SOUZA LIMA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4065294</strong></td>
+        <td>EDSON CARLOS SOARES JUNIOR</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3126689</strong></td>
+        <td>VINICIUS FERNANDO DO NASCIMENTO DA SILVA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4225606</strong></td>
+        <td>RICHARD ALEXANDER DIAZ VALDEZ</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3523476</strong></td>
+        <td>VINICIUS LOPES RIBEIRO DUARTE</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3460069</strong></td>
+        <td>ADRIANO DIAS DE CERQUEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4237677</strong></td>
+        <td>HENRIQUE AUGUSTO GOMES DE SOUZA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2117234</strong></td>
+        <td>DOUGLAS AVANCINI TEIXEIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3064351</strong></td>
+        <td>WILLIANS APARECIDO PINHEIRO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4222794</strong></td>
+        <td>VITOR HENRIQUE ALVES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4217458</strong></td>
+        <td>EDUARDO BONATTO DE MACEDO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4218282</strong></td>
+        <td>CHRISTIAN MATEUS SILVA NEVES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3760329</strong></td>
+        <td>DENIS CARVALHO BONORA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2099294</strong></td>
+        <td>JONAS FERREIRA DA SILVA RAMOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4060628</strong></td>
+        <td>JONATAS KAIK SANTOS CORDEIRO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4208071</strong></td>
+        <td>EDUARDO BARAUNA DE SOUZA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4209702</strong></td>
+        <td>GIOVANI GOMES RAULINAITIS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3610553</strong></td>
+        <td>KAUA DOS SANTOS PEREIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3551727</strong></td>
+        <td>FERNANDO GONZAGA DE FARIAS</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4184673</strong></td>
+        <td>RAFAEL SOARES DE MOURA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4197905</strong></td>
+        <td>IZAQUE DA MOTTA RODRIGUES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4200140</strong></td>
+        <td>LUCAS CAUE RIBEIRO DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4153968</strong></td>
+        <td>WENDSON RAMOS DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3355820</strong></td>
+        <td>BRUNO CARLOS FERREIRA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4049883</strong></td>
+        <td>MARCIANO SANTOS NOVAIS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4194528</strong></td>
+        <td>ADEMIR SANTANA DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>2974772</strong></td>
+        <td>CLEYTON DA SILVA DE OLIVEIRA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4195431</strong></td>
+        <td>GABRIEL ISRAEL FRANCA DO NASCIMENTO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4194438</strong></td>
+        <td>GIOVANNE VASCONCELOS GONCALVES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4192606</strong></td>
+        <td>GUILHERME DE SOUZA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3494742</strong></td>
+        <td>RICARDO LIMA COSTA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3317605</strong></td>
+        <td>DANIEL BARROS DE SOUZA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4192022</strong></td>
+        <td>WESLLEI DE MIRANDA MACIEL</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4037848</strong></td>
+        <td>EDUARDO DA SILVA LISBOA</td>
+        <td>PASSEIO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3446814</strong></td>
+        <td>MILTON PEREIRA DA SILVA</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4173626</strong></td>
+        <td>VINICIUS SILVA RODRIGUES</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4174828</strong></td>
+        <td>LUCAS ALVES DOS SANTOS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4172586</strong></td>
+        <td>RENATO LOPES DE SOUSA SILVA</td>
+        <td>FIORINO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>4174582</strong></td>
+        <td>DENILSON DE LIMA MERGULHAO</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+    <tr>
+        <td><strong>3155524</strong></td>
+        <td>MARIA D AJUDA PINHEIRO DANTAS</td>
+        <td>MOTO</td>
+        <td>Nunca realizou</td>
+        <td><span class="badge bg-danger">N/A</span></td>
+        <td><span class="badge bg-warning text-dark">Sem Rotas Registradas</span></td>
+    </tr>
+    
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Gráfico de Faixas de Inatividade
+    const ctxFaixas = document.getElementById('chartFaixas').getContext('2d');
+    new Chart(ctxFaixas, {
+        type: 'bar',
+        data: {
+            labels: ['21 a 30 Dias', '31 a 60 Dias', '> 60 Dias', 'Sem Rota'],
+            datasets: [{
+                label: 'Qtd. Motoristas',
+                data: [0, 0, 0, 3502],
+                backgroundColor: ['#ffc107', '#fd7e14', '#dc3545', '#6c757d']
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    // Gráfico Donut de Proporção
+    const ctxProp = document.getElementById('chartProporcao').getContext('2d');
+    new Chart(ctxProp, {
+        type: 'doughnut',
+        data: {
+            labels: ['Ativos (<=20d)', 'Inativos (>20d)'],
+            datasets: [{
+                data: [0, 3502],
+                backgroundColor: ['#198754', '#dc3545']
+            }]
+        },
+        options: { responsive: true }
+    });
+
+    // Filtro de Busca na Tabela
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll('#driversTable tbody tr');
+        rows.forEach(row => {
+            let text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    });
+</script>
+</body>
+</html>
