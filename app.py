@@ -244,7 +244,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 col_driver_id = df_drivers.columns[0]
 
             col_phone = next((c for c in df_drivers.columns if any(k in c.lower() for k in ['phone', 'mobile', 'celular', 'whatsapp', 'contato', 'telefone'])), None)
-            col_vehicle = next((c for c in df_drivers.columns if any(k in c.lower() for k in ['vehicle', 'veiculo', 'tipo veiculo', 'car'])), 'Vehicle Type')
 
             df_ativos = df_drivers[df_drivers[col_status] == 'Active'].copy()
             df_ativos['ID_LIMPO'] = df_ativos[col_driver_id].apply(converter_id_cientifico)
@@ -315,8 +314,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
             df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
 
-            # Opções de Veículos para Filtro Inteligente
-            veiculos_unicos = sorted(list(set(df_analise[col_vehicle].dropna().astype(str).unique()))) if col_vehicle in df_analise.columns else []
+            # Garantir extração exata do tipo de veículo da coluna oficial
+            col_veh_name = next((c for c in df_drivers.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
+            veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).unique()))) if col_veh_name in df_analise.columns else []
             veiculos_options_html = '<option value="TODOS">🚗 Veículo: Todos</option>' + "".join([f'<option value="{v}">{v}</option>' for v in veiculos_unicos if v and v.lower() != 'nan'])
 
             total = len(df_analise)
@@ -329,7 +329,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             for _, r in df_analise.iterrows():
                 d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
                 d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
-                d_veh = str(r.get(col_vehicle, 'N/I')).replace("'", "").replace('"', '')
+                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '')
                 d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
                 d_dias_at = r['Dias_Sem_AT_Fmt']
                 d_status = r['Status_Inatividade']
@@ -348,7 +348,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 if d_phone_clean:
                     copy_phone_btn = f'''
                     <button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700; transition: all 0.2s;">
-                        📋 Whats
+                        📋 Copiar
                     </button>
                     '''
                 else:
@@ -398,9 +398,16 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     
                     .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
                     
+                    .header-bar {{
+                        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
+                    }}
+                    .section-title {{
+                        color: #EE4D2D; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;
+                    }}
+
                     .filter-toolbar {{
                         display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-                        background: #161616; padding: 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px;
+                        background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px;
                     }}
 
                     .toolbar-group {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
@@ -458,20 +465,22 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 </div>
             </div>
 
-            <!-- BARRA DE FERRAMENTAS & FILTROS INTELIGENTES -->
+            <!-- CONTAINER DA TABELA -->
             <div class="table-container">
                 
+                <!-- CABEÇALHO DO BLOCO COM TÍTULO E CAMPO DE BUSCA -->
+                <div class="header-bar">
+                    <div class="section-title">📋 Detalhamento da Base de Motoristas</div>
+                    <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 280px;">
+                </div>
+
+                <!-- BARRA DE FILTROS E AÇÕES DE CÓPIA -->
                 <div class="filter-toolbar">
                     <div class="toolbar-group">
-                        <!-- CAIXA DE BUSCA COM TECLA ENTER -->
-                        <input type="text" id="searchInput" class="search-input" onkeyup="if(event.key==='Enter') aplicarFiltros(); else aplicarFiltros();" placeholder="🔎 Buscar por ID, Nome ou Veículo..." style="width: 220px;">
-                        
-                        <!-- BOTÃO DE PESQUISA -->
-                        <button onclick="aplicarFiltros()" class="action-btn primary" title="Executar pesquisa nos campos">
+                        <button onclick="aplicarFiltros()" class="action-btn primary">
                             🔎 Pesquisar
                         </button>
 
-                        <!-- FILTRO INTELIGENTE 1: DIAS SEM AT -->
                         <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
                             <option value="TODOS">⏱️ Dias sem AT: Todos</option>
                             <option value="0-7">🟢 0 a 7 dias sem AT</option>
@@ -481,12 +490,10 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                             <option value="SEM">⚪ Sem Histórico de Rotas</option>
                         </select>
 
-                        <!-- FILTRO INTELIGENTE 2: TIPO DE VEÍCULO -->
                         <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">
                             {veiculos_options_html}
                         </select>
 
-                        <!-- BOTÃO DE LIMPAR FILTROS -->
                         <button onclick="limparFiltros()" class="action-btn" title="Restaurar visualização original">
                             🔄 Limpar Filtros
                         </button>
@@ -510,12 +517,12 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         <thead>
                             <tr>
                                 <th style="text-align: center; width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
-                                <th>Driver ID</th>
-                                <th>Nome do Motorista</th>
-                                <th>Veículo</th>
-                                <th>Dias Sem Histórico de AT</th>
-                                <th>Status Inatividade</th>
-                                <th style="text-align: center;">Contato / WhatsApp</th>
+                                <th>DRIVER ID</th>
+                                <th>NOME DO MOTORISTA</th>
+                                <th>VEÍCULO</th>
+                                <th>DIAS SEM HISTÓRICO DE AT</th>
+                                <th>STATUS INATIVIDADE</th>
+                                <th style="text-align: center;">CONTATO / WHATSAPP</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -548,13 +555,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         let rowVeh = row.getAttribute('data-veh');
                         let rowText = row.textContent.toLowerCase();
 
-                        // 1. Filtro Card KPI / Status
                         let matchCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
-                        
-                        // 2. Filtro Busca Texto Geral
                         let matchText = (searchText === '') || rowText.includes(searchText);
 
-                        // 3. Filtro Dias Sem AT
                         let matchDias = true;
                         if (diasVal === '0-7') matchDias = (rowDias >= 0 && rowDias <= 7);
                         else if (diasVal === '8-15') matchDias = (rowDias >= 8 && rowDias <= 15);
@@ -562,7 +565,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         else if (diasVal === '21+') matchDias = (rowDias > 20 && rowDias < 9999);
                         else if (diasVal === 'SEM') matchDias = (rowDias === 9999);
 
-                        // 4. Filtro Tipo de Veículo
                         let matchVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
 
                         if (matchCard && matchText && matchDias && matchVeh) {{
