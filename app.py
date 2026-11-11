@@ -11,9 +11,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento
+    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
 except ImportError:
     renderizar_modulo_reengajamento = None
+    salvar_historico = None
+    carregar_historico = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -24,12 +26,8 @@ st.set_page_config(
     layout="wide",
 )
 
-# Inicializa sessão de navegação e compartilhamento de motoristas
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "📊 Control Tower Churn"
-
-if "drivers_para_agendar" not in st.session_state:
-    st.session_state["drivers_para_agendar"] = []
 
 # Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
@@ -134,7 +132,6 @@ st.sidebar.markdown(f"""
 
 opcoes_menu = ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"]
 
-# Atualiza rádio dinamicamente conforme estado da sessão
 opcao_menu = st.sidebar.radio(
     "Navegação do Sistema:",
     opcoes_menu,
@@ -211,18 +208,6 @@ with col_up2:
 
 data_ref = st.date_input('Data de Referência', value=datetime(2026, 11, 10))
 data_ref = datetime.combine(data_ref, datetime.min.time())
-
-# CAPTURA ENVIO VINDO DO HTML COMPONENT
-query_params = st.query_params
-if "payload_agendar" in query_params:
-    try:
-        dados_json = json.loads(query_params["payload_agendar"])
-        st.session_state["drivers_para_agendar"] = dados_json
-        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-        st.query_params.clear()
-        st.rerun()
-    except Exception:
-        pass
 
 st.divider()
 
@@ -337,17 +322,33 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 else:
                     badge = '<span style="background: rgba(158, 158, 158, 0.2); color: #B0BEC5; border: 1px solid #B0BEC5; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Sem Histórico</span>'
 
-                copy_phone_btn = f'''<button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700;">📋 Copiar</button>''' if d_phone_clean else '<span style="color: #777; font-size: 0.75rem;">Sem Whats</span>'
+                # Ações Individuais (WhatsApp + Cópias)
+                if d_phone_clean:
+                    url_wa_indiv = f"https://api.whatsapp.com/send?phone={d_phone_clean}"
+                    actions_cell = f'''
+                    <div style="display: flex; gap: 6px; align-items: center; justify-content: center;">
+                        <a href="{url_wa_indiv}" target="_blank" style="background: #25D366; color: #FFF; text-decoration: none; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">📲 Whats</a>
+                        <button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700;">📋 Tel</button>
+                    </div>
+                    '''
+                else:
+                    actions_cell = '<span style="color: #777; font-size: 0.75rem;">Sem Telefone</span>'
 
                 row_html = f'''
                 <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" data-phone="{d_phone_clean}" style="border-bottom: 1px solid #2D2D2D;">
                     <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox" onclick="atualizarContadorSelecao()"></td>
-                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">{d_id}</td>
-                    <td style="padding: 10px;">{d_name}</td>
+                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
+                        {d_id}
+                        <button onclick="copiarTexto('{d_id}', this)" title="Copiar ID" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
+                    </td>
+                    <td style="padding: 10px;">
+                        {d_name}
+                        <button onclick="copiarTexto('{d_name}', this)" title="Copiar Nome" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
+                    </td>
                     <td style="padding: 10px;"><span style="background: #252525; border: 1px solid #3A3A3A; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">{d_veh}</span></td>
                     <td style="padding: 10px; font-weight: 600; color: #FFF;">{d_dias_at}</td>
                     <td style="padding: 10px;">{badge}</td>
-                    <td style="padding: 10px; text-align: center;">{copy_phone_btn}</td>
+                    <td style="padding: 10px; text-align: center;">{actions_cell}</td>
                 </tr>
                 '''
                 rows_list.append(row_html)
@@ -361,18 +362,21 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 <style>
                     body {{ background-color: #121212; color: #EEEEEE; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 10px; }}
                     .kpi-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }}
-                    .kpi-card {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer; }}
-                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; }}
+                    .kpi-card {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.25s ease; }}
+                    .kpi-card:hover {{ border-color: #EE4D2D; }}
+                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; box-shadow: 0 0 15px rgba(238, 77, 45, 0.4); }}
                     .kpi-title {{ font-size: 0.75rem; text-transform: uppercase; color: #888888; font-weight: 700; }}
                     .kpi-num {{ font-size: 1.8rem; font-weight: 800; color: #FFF; margin-top: 5px; }}
                     .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
                     .filter-toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px; }}
-                    .action-btn {{ background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }}
-                    .search-input, .select-input {{ background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; }}
+                    .action-btn {{ background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
+                    .action-btn:hover {{ border-color: #EE4D2D; color: #EE4D2D; }}
+                    .action-btn.primary {{ background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%); border: none; color: white; font-weight: 800; }}
+                    .search-input, .select-input {{ background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }}
                     table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
-                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; }}
+                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
                     tr:hover {{ background-color: #242424; }}
-                    .badge-selected {{ background: rgba(238, 77, 45, 0.2); color: #EE4D2D; padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D; }}
+                    .badge-selected {{ background: rgba(238, 77, 45, 0.2); color: #EE4D2D; font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D; }}
                 </style>
             </head>
             <body>
@@ -390,19 +394,23 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
             <div class="table-container">
                 <div class="filter-toolbar">
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar..." style="width: 200px;">
+                    <div style="display:flex; gap:8px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 240px;">
                         <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
                             <option value="TODOS">⏱️ Dias: Todos</option>
+                            <option value="0-7">🟢 0 a 7 dias</option>
+                            <option value="8-15">🟡 8 a 15 dias</option>
+                            <option value="16-20">🟧 16 a 20 dias</option>
+                            <option value="21+">🔴 >20 dias (Churn)</option>
                             <option value="SEM">⚪ Sem Histórico</option>
                         </select>
                         <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">{veiculos_options_html}</select>
+                        <button onclick="limparFiltros()" class="action-btn">🔄 Limpar</button>
                     </div>
 
                     <div style="display:flex; gap:8px;">
-                        <button onclick="enviarParaAgendamento()" class="action-btn" style="background: #EE4D2D; color: white; border: none; font-weight: 800;">
-                            📅 Direcionar para Agendamento (<span id="lblSelecionados">0</span>)
-                        </button>
+                        <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
+                        <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
                     </div>
                 </div>
 
@@ -412,11 +420,11 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                             <tr>
                                 <th style="text-align: center; width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
                                 <th>DRIVER ID</th>
-                                <th>NOME</th>
+                                <th>NOME DO MOTORISTA</th>
                                 <th>VEÍCULO</th>
-                                <th>DIAS SEM AT</th>
-                                <th>STATUS</th>
-                                <th style="text-align: center;">AÇÕES</th>
+                                <th>DIAS SEM HISTÓRICO DE AT</th>
+                                <th>STATUS INATIVIDADE</th>
+                                <th style="text-align: center;">AÇÕES INDIVIDUAIS</th>
                             </tr>
                         </thead>
                         <tbody>{table_rows}</tbody>
@@ -436,11 +444,13 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
                 function aplicarFiltros() {{
                     let search = document.getElementById('searchInput').value.toLowerCase().trim();
+                    let diasVal = document.getElementById('diasFilter').value;
                     let vehVal = document.getElementById('veiculoFilter').value.toUpperCase().trim();
                     let rows = document.querySelectorAll('#driversTable tbody tr');
 
                     rows.forEach(row => {{
                         let rowStatus = row.getAttribute('data-status');
+                        let rowDias = parseInt(row.getAttribute('data-dias'));
                         let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
                         let rowText = row.textContent.toLowerCase();
 
@@ -448,8 +458,28 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         let mText = (search === '') || rowText.includes(search);
                         let mVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
 
-                        row.style.display = (mCard && mText && mVeh) ? '' : 'none';
+                        let mDias = true;
+                        if (diasVal === '0-7') mDias = (rowDias >= 0 && rowDias <= 7);
+                        else if (diasVal === '8-15') mDias = (rowDias >= 8 && rowDias <= 15);
+                        else if (diasVal === '16-20') mDias = (rowDias >= 16 && rowDias <= 20);
+                        else if (diasVal === '21+') mDias = (rowDias > 20 && rowDias < 9999);
+                        else if (diasVal === 'SEM') mDias = (rowDias === 9999);
+
+                        row.style.display = (mCard && mText && mVeh && mDias) ? '' : 'none';
                     }});
+                }}
+
+                function limparFiltros() {{
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('diasFilter').value = 'TODOS';
+                    document.getElementById('veiculoFilter').value = 'TODOS';
+                    currentCardStatus = 'TODOS';
+                    document.querySelectorAll('.kpi-card').forEach(c => c.classList.remove('active'));
+                    document.querySelectorAll('.kpi-card')[0].classList.add('active');
+                    document.querySelectorAll('.driver-checkbox').forEach(cb => cb.checked = false);
+                    document.getElementById('selectAll').checked = false;
+                    atualizarContadorSelecao();
+                    aplicarFiltros();
                 }}
 
                 function toggleSelectAll(masterCb) {{
@@ -464,41 +494,100 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
                 function atualizarContadorSelecao() {{
                     let checked = document.querySelectorAll('.driver-checkbox:checked').length;
-                    document.getElementById('lblSelecionados').textContent = checked;
+                    let btn = window.parent.document.querySelector('button[key="btn_massa_trigger"]');
                 }}
 
-                function enviarParaAgendamento() {{
-                    let selecionados = [];
-                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
-                        let cb = row.querySelector('.driver-checkbox');
-                        if (cb && cb.checked) {{
-                            selecionados.push({{
-                                id: row.getAttribute('data-id'),
-                                nome: row.getAttribute('data-name'),
-                                veh: row.getAttribute('data-veh'),
-                                phone: row.getAttribute('data-phone')
-                            }});
+                function copiarTexto(texto, btnElement) {{
+                    navigator.clipboard.writeText(texto).then(() => {{
+                        let orig = btnElement.innerHTML;
+                        btnElement.innerHTML = '✅ Copiado!';
+                        btnElement.style.background = '#00C853';
+                        setTimeout(() => {{ btnElement.innerHTML = orig; btnElement.style.background = ''; }}, 1400);
+                    }});
+                }}
+
+                function copiarVisiveis(tipo) {{
+                    let rows = document.querySelectorAll('#driversTable tbody tr');
+                    let lista = [];
+                    rows.forEach(row => {{
+                        if (row.style.display !== 'none') {{
+                            let val = row.getAttribute('data-' + tipo);
+                            if (val) lista.push(val);
                         }}
                     }});
-
-                    if (selecionados.length === 0) {{
-                        alert('Selecione pelo menos 1 motorista para agendar!');
-                        return;
-                    }}
-
-                    let jsonStr = encodeURIComponent(JSON.stringify(selecionados));
-                    window.parent.location.href = window.parent.location.pathname + '?payload_agendar=' + jsonStr;
-                }}
-
-                function copiarTexto(texto, btn) {{
-                    navigator.clipboard.writeText(texto).then(() => {{
-                        btn.innerHTML = '✅ Copiado!';
-                        setTimeout(() => {{ btn.innerHTML = '📋 Copiar'; }}, 1200);
-                    }});
+                    if (lista.length === 0) return alert('Nenhum item visível!');
+                    navigator.clipboard.writeText(lista.join('\\n')).then(() => alert('✅ ' + lista.length + ' itens copiados!'));
                 }}
             </script>
             </body>
             </html>
             '''
 
-            components.html(html_component, height=730, scrolling=True)
+            components.html(html_component, height=710, scrolling=True)
+
+            # ==========================================
+            # PAINEL DE DISPARO EM MASSA / REUNIÃO (STREAMLIT NATIVO)
+            # ==========================================
+            st.markdown("### 📲 Acionamento & Agendamento de Reunião em Massa")
+            st.caption("Selecione os motoristas desejados na tabela acima para agendar o disparo coletivo:")
+
+            # Seleção direta no Streamlit para garantir estabilidade do botão de envio
+            drivers_opcoes = [f"{r[col_driver_id]} - {r.get('Driver Name', 'Motorista')} ({r['Telefone_Limpo']})" for _, r in df_analise.iterrows() if r['Telefone_Limpo']]
+            
+            selecionados_massa = st.multiselect(
+                "Motoristas selecionados para o disparo em massa:",
+                options=drivers_opcoes,
+                default=drivers_opcoes[:5] if len(drivers_opcoes) >= 5 else drivers_opcoes
+            )
+
+            c_box1, c_box2 = st.columns(2)
+            with c_box1:
+                dt_reuniao = st.date_input("Data Agendada para Reunião", value=datetime.now())
+                hr_reuniao = st.time_input("Horário da Reunião", value=datetime.now().time())
+            with c_box2:
+                pauta_reuniao = st.selectbox("Pauta Principal", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
+                link_reuniao = st.text_input("Link da Reunião (Meet/Teams)", "https://meet.google.com/spx-fleet-lsp93")
+
+            if st.button("🚀 REGISTRAR AGENDAMENTO E IR PARA GERENCIADOR DE ENVIOS", type="primary"):
+                if not selecionados_massa:
+                    st.warning("Selecione pelo menos 1 motorista na caixa acima.")
+                else:
+                    novos = []
+                    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    
+                    for item in selecionados_massa:
+                        partes = item.split(" - ")
+                        d_id = partes[0]
+                        sub_partes = partes[1].split(" (")
+                        d_name = sub_partes[0]
+                        d_phone = sub_partes[1].replace(")", "")
+                        
+                        novos.append({
+                            "Driver ID": d_id,
+                            "Nome": d_name,
+                            "Telefone": d_phone,
+                            "Veiculo": "N/I",
+                            "Data Acionamento": agora_str,
+                            "Data Reunião": dt_reuniao.strftime("%d/%m/%Y"),
+                            "Horário": hr_reuniao.strftime("%H:%M"),
+                            "Status": "Aguardando Reunião",
+                            "Observação": f"Pauta: {pauta_reuniao} | Link: {link_reuniao}"
+                        })
+                    
+                    if novos and salvar_historico and carregar_historico:
+                        df_h = carregar_historico()
+                        df_f = pd.concat([pd.DataFrame(novos), df_h], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
+                        salvar_historico(df_f)
+                        
+                        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+                        st.toast("✅ Reuniões registradas no histórico!", icon="🚀")
+                        st.rerun()
+
+img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
+footer_html = f'''
+<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 15px;">
+    {img_footer_html}
+    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
+</div>
+'''
+st.markdown(footer_html, unsafe_allow_html=True)
