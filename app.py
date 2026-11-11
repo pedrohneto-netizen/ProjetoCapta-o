@@ -10,11 +10,12 @@ import pandas as pd
 import streamlit as st
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
+    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico, registrar_ou_atualizar_driver
 except ImportError:
     renderizar_modulo_reengajamento = None
     salvar_historico = None
     carregar_historico = None
+    registrar_ou_atualizar_driver = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -25,14 +26,16 @@ st.set_page_config(
     layout="wide",
 )
 
-# Inicialização de Estados da Sessão
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "📊 Control Tower Churn"
 
 if "filtro_kpi_status" not in st.session_state:
     st.session_state["filtro_kpi_status"] = "TODOS"
 
-# Estilização Neon Fluorescente do Menu e Cards Gerenciais
+if "marcar_todos_state" not in st.session_state:
+    st.session_state["marcar_todos_state"] = False
+
+# Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
@@ -41,7 +44,6 @@ st.markdown("""
         --shopee-orange: #EE4D2D;
         --shopee-neon: #FF5722;
         --shopee-dark-bg: #121212;
-        --shopee-card-bg: #1E1E1E;
     }
 
     body, .main, .stApp {
@@ -50,7 +52,6 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
 
-    /* BARRA LATERAL LED NEON */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
         border-right: 2px solid var(--shopee-orange) !important;
@@ -93,7 +94,6 @@ st.markdown("""
         box-shadow: 0 0 8px #EE4D2D;
     }
 
-    /* METRIC CARDS GERENCIAIS */
     .metric-card-gerencial {
         background: #1E1E1E;
         border: 1px solid #2D2D2D;
@@ -101,12 +101,8 @@ st.markdown("""
         padding: 14px 18px;
         text-align: center;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: all 0.2s ease;
     }
-    .metric-card-gerencial:hover {
-        border-color: #EE4D2D;
-        transform: translateY(-2px);
-    }
+
     .metric-num {
         font-size: 1.8rem;
         font-weight: 800;
@@ -316,9 +312,9 @@ if st.button('🚀 GERAR ANÁLISE E PAINEL GERENCIAL', type="primary", use_conta
             st.session_state["df_analise_cache"] = df_analise
             st.session_state["col_driver_id_name"] = col_driver_id
             st.session_state["col_veh_name"] = col_veh_name
-            st.toast("Painel de dados gerado com sucesso!", icon="✅")
+            st.toast("Painel gerencial atualizado!", icon="✅")
 
-# EXIBIÇÃO DO PAINEL GERENCIAL SE HOUVER DADOS PROCESSADOS
+# EXIBIÇÃO DO PAINEL GERENCIAL
 if "df_analise_cache" in st.session_state:
     df_analise = st.session_state["df_analise_cache"]
     col_driver_id = st.session_state["col_driver_id_name"]
@@ -377,7 +373,6 @@ if "df_analise_cache" in st.session_state:
             st.session_state["filtro_kpi_status"] = "TODOS"
             st.rerun()
 
-    # APLICAÇÃO DOS FILTROS NA BASE EXIBIDA
     df_exibir = df_analise.copy()
     if st.session_state["filtro_kpi_status"] != "TODOS":
         df_exibir = df_exibir[df_exibir["Status_Inatividade"] == st.session_state["filtro_kpi_status"]]
@@ -392,16 +387,24 @@ if "df_analise_cache" in st.session_state:
             df_exibir["Driver Name"].astype(str).str.lower().str.contains(termo)
         ]
 
-    st.markdown(f"### 📋 Tabela Gerencial de Operação (`{len(df_exibir)} motoristas filtrados`)")
+    st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
 
-    # PREPARAÇÃO DA TABELA NATIVA COM COLUNA DE WHATSAPP DIRETO
+    # BOTÃO PARA MARCAR/DESMARCAR TODOS
+    col_t1, col_t2 = st.columns([1.5, 3.5])
+    with col_t1:
+        if st.button("✅ Selecionar Todos / Inverter Seleção"):
+            st.session_state["marcar_todos_state"] = not st.session_state["marcar_todos_state"]
+            st.rerun()
+
+    # PREPARAÇÃO DA TABELA NATIVA
     df_tabela = pd.DataFrame()
-    df_tabela["Selecionar"] = False
+    df_tabela["Acionar"] = st.session_state["marcar_todos_state"]
     df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
     df_tabela["Nome do Motorista"] = df_exibir["Driver Name"].astype(str)
     df_tabela["Veículo"] = df_exibir[col_veh_name].astype(str)
     df_tabela["Inatividade"] = df_exibir["Dias_Sem_AT_Fmt"]
     df_tabela["Status"] = df_exibir["Status_Inatividade"]
+    df_tabela["Telefone"] = df_exibir["Telefone_Limpo"]
     df_tabela["WhatsApp"] = df_exibir["Telefone_Limpo"].apply(
         lambda p: f"https://api.whatsapp.com/send?phone={p}" if p else ""
     )
@@ -409,12 +412,13 @@ if "df_analise_cache" in st.session_state:
     df_editado_tabela = st.data_editor(
         df_tabela,
         column_config={
-            "Selecionar": st.column_config.CheckboxColumn("Acionar", default=False),
+            "Acionar": st.column_config.CheckboxColumn("Acionar em Massa", default=False),
             "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
             "Nome do Motorista": st.column_config.TextColumn("Nome do Motorista", disabled=True),
             "Veículo": st.column_config.TextColumn("Veículo", disabled=True),
             "Inatividade": st.column_config.TextColumn("Dias Sem AT", disabled=True),
             "Status": st.column_config.TextColumn("Status", disabled=True),
+            "Telefone": st.column_config.TextColumn("Contato Tel", disabled=True),
             "WhatsApp": st.column_config.LinkColumn("📲 Disparo Direto", display_text="Abrir Whats")
         },
         hide_index=True,
@@ -422,31 +426,30 @@ if "df_analise_cache" in st.session_state:
         key="tabela_gerencial_drivers"
     )
 
-    # PROCESSAMENTO DE ACIONAMENTO EM MASSA DAS LINHAS CHECADAS
-    drivers_marcados = df_editado_tabela[df_editado_tabela["Selecionar"] == True]
+    drivers_marcados = df_editado_tabela[df_editado_tabela["Acionar"] == True]
 
     st.markdown("---")
-    st.markdown("### 🚀 Central de Disparo em Massa & Reagendamento")
+    st.markdown("### 📍 Configuração do Treinamento Presencial & Disparo em Massa")
     
-    col_m1, col_m2 = st.columns([2, 1])
-    with col_m1:
-        st.info(f"📍 **{len(drivers_marcados)} motorista(s)** selecionado(s) na tabela acima para envio em massa.")
-    with col_m2:
-        dt_ag = st.date_input("Data da Reunião", value=datetime.now())
-        hr_ag = st.time_input("Horário da Reunião", value=datetime.now().time())
+    col_e1, col_e2, col_e3 = st.columns([2, 1, 1])
+    with col_e1:
+        endereco_hub_input = st.text_input("📍 Endereço do HUB / Local do Treinamento Presencial", "Av. Industrial, 1000 - Galpão SPX - Santo André / SP")
+    with col_e2:
+        dt_ag = st.date_input("Data do Treinamento", value=datetime.now())
+    with col_e3:
+        hr_ag = st.time_input("Horário do Treinamento", value=datetime.now().time())
 
-    pauta_ag = st.selectbox("Pauta Principal", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
-    link_ag = st.text_input("Link da Reunião (Meet / Teams)", "https://meet.google.com/spx-fleet-lsp93")
+    pauta_ag = st.selectbox("Pauta do Treinamento", ["Reintegração & Capacitação Presencial", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
 
-    if st.button("📲 ENVIAR SELECIONADOS PARA O AGENDAMENTO & REUNIÕES", type="primary", use_container_width=True):
+    if st.button(f"📲 AGENDAR TREINAMENTO PRESENCIAL E GERAR FILA ({len(drivers_marcados)} selecionados)", type="primary", use_container_width=True):
         if drivers_marcados.empty:
-            st.warning("Marque pelo menos 1 motorista no checkbox 'Acionar' da tabela acima!")
+            st.warning("Selecione pelo menos 1 motorista na tabela acima!")
         else:
             novos_registros = []
             agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
             for _, r in drivers_marcados.iterrows():
-                phone_raw = r["WhatsApp"].replace("https://api.whatsapp.com/send?phone=", "")
+                phone_raw = r["Telefone"]
                 novos_registros.append({
                     "Driver ID": str(r["Driver ID"]),
                     "Nome": str(r["Nome do Motorista"]),
@@ -456,7 +459,7 @@ if "df_analise_cache" in st.session_state:
                     "Data Reunião": dt_ag.strftime("%d/%m/%Y"),
                     "Horário": hr_ag.strftime("%H:%M"),
                     "Status": "Aguardando Reunião",
-                    "Observação": f"Pauta: {pauta_ag} | Link: {link_ag}"
+                    "Endereço HUB / Pauta": f"{endereco_hub_input} ({pauta_ag})"
                 })
 
             if novos_registros and salvar_historico and carregar_historico:
@@ -465,13 +468,13 @@ if "df_analise_cache" in st.session_state:
                 salvar_historico(df_f)
 
                 st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-                st.toast("✅ Reuniões agendadas! Redirecionando...", icon="🚀")
+                st.toast("✅ Reuniões presenciais registradas!", icon="🚀")
                 st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
 footer_html = f'''
-<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 15px;">
-    {img_footer_html}
+<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display:flex; align-items:center; gap: 12px;">{img_footer_html} <span style="color:#FFF; font-weight:700;">SPX Logistics</span></div>
     <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
 </div>
 '''
