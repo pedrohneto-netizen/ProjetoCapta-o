@@ -5,7 +5,6 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
-import urllib.parse
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -59,6 +58,12 @@ st.markdown("""
         text-align: center;
     }
 
+    .sidebar-logo {
+        height: 75px;
+        margin-bottom: 8px;
+        filter: drop-shadow(0 0 8px rgba(238, 77, 45, 0.5));
+    }
+
     .sidebar-title {
         color: #FFFFFF;
         font-weight: 800;
@@ -89,9 +94,34 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Menu Lateral LED Neon
-st.sidebar.markdown("""
+# ==========================================
+# CACHE DE IMAGENS (LOGO OFICIAL FORMULA 1_2_2.JPG)
+# ==========================================
+@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
+def get_base64_image_cached(image_path_str):
+    if os.path.exists(image_path_str):
+        ext = os.path.splitext(image_path_str)[1].lower().replace('.', '')
+        mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
+        with open(image_path_str, 'rb') as img_file:
+            encoded = base64.b64encode(img_file.read()).decode('utf-8')
+            return f"data:image/{mime};base64,{encoded}"
+    return ''
+
+PATH_PROJECT = Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn')
+
+# Logo Oficial do Projeto
+img_logo_oficial = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2_2.jpg'))
+if not img_logo_oficial:
+    img_logo_oficial = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2.jpg'))
+
+img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
+
+# Menu Lateral LED Neon com a Logo Oficial
+sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else ''
+
+st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
+    {sidebar_img_html}
     <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
     <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
 </div>
@@ -116,20 +146,6 @@ if opcao_menu == "📅 Reengajamento & Reuniões":
 # ==========================================
 # CÓDIGO DO DASHBOARD PRINCIPAL
 # ==========================================
-@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
-def get_base64_image_cached(image_path_str):
-    if os.path.exists(image_path_str):
-        ext = os.path.splitext(image_path_str)[1].lower().replace('.', '')
-        mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
-        with open(image_path_str, 'rb') as img_file:
-            encoded = base64.b64encode(img_file.read()).decode('utf-8')
-            return f"data:image/{mime};base64,{encoded}"
-    return ''
-
-PATH_PROJECT = Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn')
-img_kart_src = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2.jpg'))
-img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
-
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
         return ''
@@ -158,7 +174,7 @@ def encontrar_colunas(cols):
     dt_col = next((c for c in cols if any(k in c.lower() for k in ['delivery date', 'route date', 'task date', 'created', 'date'])), None)
     return d_col, dt_col
 
-header_img_html = f'<img src="{img_kart_src}" style="height: 90px;" alt="Shopito">' if img_kart_src else '🏎️'
+header_img_html = f'<img src="{img_logo_oficial}" style="height: 90px; filter: drop-shadow(0 0 10px rgba(238,77,45,0.6));" alt="Logo Oficial SPX">' if img_logo_oficial else '🏎️'
 
 header_html = f'''
 <div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 20px rgba(238,77,45,0.3);">
@@ -287,9 +303,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
             rows_list = []
             for _, r in df_analise.iterrows():
-                d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
-                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
-                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '').strip()
+                d_id = str(r[col_driver_id]).replace("'", "").replace('', '')
+                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('', '')
+                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('', '').strip()
                 d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
                 d_dias_at = r['Dias_Sem_AT_Fmt']
                 d_status = r['Status_Inatividade']
