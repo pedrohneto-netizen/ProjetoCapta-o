@@ -59,7 +59,8 @@ st.markdown("""
     }
 
     .sidebar-logo {
-        height: 75px;
+        max-height: 80px;
+        width: auto;
         margin-bottom: 8px;
         filter: drop-shadow(0 0 8px rgba(238, 77, 45, 0.5));
     }
@@ -99,7 +100,6 @@ st.markdown("""
 # ==========================================
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_filename):
-    # 1. Tenta buscar na raiz do projeto (Streamlit Cloud / GitHub)
     possible_paths = [
         Path(image_filename),
         Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn') / image_filename
@@ -122,11 +122,10 @@ if not img_logo_oficial:
 img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
 
 # ==========================================
-# MENU LATERAL LED NEON COMunsafe_allow_html=True
+# MENU LATERAL LED NEON (HTML CORRIGIDO)
 # ==========================================
-sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo Oficial SPX">' if img_logo_oficial else '🏎️'
+sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else '🏎️'
 
-# O parâmetro unsafe_allow_html=True impede que o HTML apareça como texto!
 st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
     <div style="text-align: center; margin-bottom: 8px;">{sidebar_img_html}</div>
@@ -134,6 +133,22 @@ st.sidebar.markdown(f"""
     <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
 </div>
 """, unsafe_allow_html=True)
+
+opcao_menu = st.sidebar.radio(
+    "Navegação do Sistema:",
+    ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"],
+    index=0
+)
+
+st.sidebar.divider()
+st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
+
+if opcao_menu == "📅 Reengajamento & Reuniões":
+    if renderizar_modulo_reengajamento:
+        renderizar_modulo_reengajamento()
+    else:
+        st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
+    st.stop()
 
 # ==========================================
 # CÓDIGO DO DASHBOARD PRINCIPAL
@@ -295,9 +310,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
             rows_list = []
             for _, r in df_analise.iterrows():
-                d_id = str(r[col_driver_id]).replace("'", "").replace('', '')
-                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('', '')
-                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('', '').strip()
+                d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
+                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
+                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '').strip()
                 d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
                 d_dias_at = r['Dias_Sem_AT_Fmt']
                 d_status = r['Status_Inatividade']
