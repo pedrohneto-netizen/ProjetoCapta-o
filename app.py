@@ -9,14 +9,82 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Importação do novo módulo isolado
+try:
+    from modulo_reengajamento import renderizar_modulo_reengajamento
+except ImportError:
+    renderizar_modulo_reengajamento = None
+
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (STREAMLIT)
+# 1. CONFIGURAÇÃO DA PÁGINA & MENU LATERAL
 # ==========================================
 st.set_page_config(
     page_title="Shopee SPX - Control Tower Churn",
     page_icon="🚚",
     layout="wide",
 )
+
+# Estilização da Barra Lateral no Tema Shopee Black
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
+    
+    :root {
+        --shopee-orange: #EE4D2D;
+        --shopee-dark-bg: #121212;
+    }
+
+    body, .main, .stApp {
+        background-color: var(--shopee-dark-bg) !important;
+        color: #EEEEEE !important;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    /* Menu Lateral */
+    [data-testid="stSidebar"] {
+        background-color: #1A1A1A !important;
+        border-right: 1px solid #2D2D2D !important;
+    }
+
+    .sidebar-title {
+        color: #EE4D2D;
+        font-weight: 800;
+        font-size: 1.2rem;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .stRadio > label {
+        color: #FFFFFF !important;
+        font-weight: 600;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Menu Lateral de Navegação
+st.sidebar.markdown('<div class="sidebar-title">🚚 SPX NAVIGATION</div>', unsafe_allow_html=True)
+opcao_menu = st.sidebar.radio(
+    "Selecione o Módulo:",
+    ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"],
+    index=0
+)
+
+st.sidebar.divider()
+st.sidebar.caption("SPX Logistics - Fleet LSP93\nVersão 2.0 (Ambiente DEV)")
+
+# Se o usuário selecionar a aba de Reengajamento:
+if opcao_menu == "📅 Reengajamento & Reuniões":
+    if renderizar_modulo_reengajamento:
+        renderizar_modulo_reengajamento()
+    else:
+        st.error("O arquivo 'modulo_reengajamento.py' não foi encontrado na pasta do projeto.")
+    st.stop()
+
+# ==========================================
+# CÓDIGO ATUAL DO DASHBOARD PRINCIPAL
+# ==========================================
 
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_path_str):
@@ -44,129 +112,6 @@ for fn in possible_kart_files:
 
 img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
 
-# ==========================================
-# 2. ESTILIZAÇÃO CSS & LAYOUT SHOPEE BLACK
-# ==========================================
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
-    
-    :root {
-        --shopee-orange: #EE4D2D;
-        --shopee-orange-hover: #FF5722;
-        --shopee-dark-bg: #121212;
-        --shopee-card-bg: #1E1E1E;
-        --shopee-border: #2D2D2D;
-    }
-
-    body, .main, .stApp {
-        background-color: var(--shopee-dark-bg) !important;
-        color: #EEEEEE !important;
-        font-family: 'Poppins', sans-serif;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .shopee-header-container {
-        background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%);
-        border-bottom: 3px solid var(--shopee-orange);
-        padding: 18px 30px;
-        border-radius: 16px;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 8px 25px rgba(238, 77, 45, 0.25);
-        animation: fadeIn 0.5s ease-in-out;
-    }
-
-    .shopee-title {
-        color: #FFFFFF !important;
-        font-size: 2.1rem !important;
-        font-weight: 800 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-    }
-
-    .shopee-subtitle {
-        color: #DDDDDD;
-        font-size: 0.95rem;
-        margin-top: 4px;
-    }
-
-    .header-kart-img {
-        height: 90px;
-        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
-        transition: transform 0.3s ease;
-    }
-
-    .header-kart-img:hover {
-        transform: scale(1.05);
-    }
-
-    .stButton>button {
-        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%) !important;
-        color: white !important;
-        font-weight: 700 !important;
-        font-size: 1.05rem !important;
-        border-radius: 10px !important;
-        border: none !important;
-        padding: 12px 28px !important;
-        width: 100% !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.3) !important;
-    }
-
-    .stButton>button:hover {
-        transform: translateY(-2px) scale(1.005) !important;
-        box-shadow: 0 6px 20px rgba(255, 87, 34, 0.5) !important;
-    }
-
-    .watermark-footer {
-        margin-top: 45px;
-        padding: 18px 25px;
-        background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%);
-        border: 1px solid rgba(238, 77, 45, 0.3);
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        pointer-events: none;
-    }
-
-    .watermark-text {
-        color: #AAAAAA;
-        font-size: 0.95rem;
-        letter-spacing: 0.5px;
-        text-align: center;
-        line-height: 1.4;
-    }
-
-    .watermark-text strong {
-        color: #EE4D2D;
-        font-weight: 700;
-    }
-
-    .watermark-img {
-        height: 55px;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4));
-        opacity: 0.9;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# 3. FUNÇÕES DE TRATAMENTO DE DADOS
-# ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
         return ''
@@ -195,22 +140,23 @@ def encontrar_colunas(cols):
     dt_col = next((c for c in cols if any(k in c.lower() for k in ['delivery date', 'route date', 'task date', 'created', 'date'])), None)
     return d_col, dt_col
 
-# ==========================================
-# 4. CABEÇALHO PERSONALIZADO COM SHOPITO KART
-# ==========================================
 if img_kart_src:
-    header_img_html = f'<img src="{img_kart_src}" class="header-kart-img" alt="Shopito Kart">'
+    header_img_html = f'<img src="{img_kart_src}" style="height: 90px;" alt="Shopito Kart">'
 else:
     header_img_html = '<div style="font-size: 3rem;">🏎️</div>'
 
-header_html = f'''<div class="shopee-header-container"><div><div class="shopee-title">SPX LOGISTICS - CONTROL TOWER CHURN</div><div class="shopee-subtitle">Painel Inteligente de Monitoramento e Reengajamento de Motoristas de Fleet</div></div><div>{header_img_html}</div></div>'''
+header_html = f'''
+<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
+    <div>
+        <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Inteligente de Monitoramento e Reengajamento de Motoristas de Fleet</div>
+    </div>
+    <div>{header_img_html}</div>
+</div>
+'''
 st.markdown(header_html, unsafe_allow_html=True)
 
-# ==========================================
-# 5. UPLOAD DE ARQUIVOS
-# ==========================================
 col_up1, col_up2 = st.columns(2)
-
 with col_up1:
     st.subheader('1. Base de Motoristas')
     arquivo_drivers = st.file_uploader('Faça o upload do CSV de motoristas do Galpão', type=['csv'])
@@ -224,9 +170,6 @@ data_ref = datetime.combine(data_ref, datetime.min.time())
 
 st.divider()
 
-# ==========================================
-# 6. PROCESSAMENTO E EXIBIÇÃO DENTRO DO HTML INTERATIVO
-# ==========================================
 if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
     if not arquivo_drivers or not arquivos_rotas:
         st.error('Por favor, faça o upload da base de motoristas (.csv) e do histórico de rotas (.zip ou .csv).')
@@ -244,8 +187,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 col_driver_id = df_drivers.columns[0]
 
             col_phone = next((c for c in df_drivers.columns if any(k in c.lower() for k in ['phone', 'mobile', 'celular', 'whatsapp', 'contato', 'telefone'])), None)
-
-            # Coluna oficial de veículo
             col_veh_name = next((c for c in df_drivers.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
 
             df_ativos = df_drivers[df_drivers[col_status] == 'Active'].copy()
@@ -317,7 +258,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
             df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
 
-            # Extração dos tipos de veículos únicos para o filtro dropdown
             veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique()))) if col_veh_name in df_analise.columns else []
             veiculos_options_html = '<option value="TODOS">🚗 Veículo: Todos</option>' + "".join([f'<option value="{v}">{v}</option>' for v in veiculos_unicos if v and v.lower() != 'nan'])
 
@@ -443,7 +383,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             </head>
             <body>
 
-            <!-- KPIS CLICÁVEIS -->
             <div class="kpi-grid">
                 <div class="kpi-card active" onclick="filtrarStatus('TODOS', this)">
                     <div class="kpi-title">🔍 Todos os Drivers</div>
@@ -467,16 +406,12 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 </div>
             </div>
 
-            <!-- CONTAINER DA TABELA -->
             <div class="table-container">
-                
-                <!-- CABEÇALHO DO BLOCO COM TÍTULO E CAMPO DE BUSCA DE TEXTO -->
                 <div class="header-bar">
                     <div class="section-title">📋 Detalhamento da Base de Motoristas</div>
                     <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 280px;">
                 </div>
 
-                <!-- BARRA DE FILTROS E AÇÕES DE CÓPIA -->
                 <div class="filter-toolbar">
                     <div class="toolbar-group">
                         <button onclick="aplicarFiltros()" class="action-btn primary">
@@ -557,13 +492,9 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
                         let rowText = row.textContent.toLowerCase();
 
-                        // 1. Filtro Card KPI / Status
                         let matchCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
-                        
-                        // 2. Filtro Busca Texto Geral
                         let matchText = (searchText === '') || rowText.includes(searchText);
 
-                        // 3. Filtro Dias Sem AT
                         let matchDias = true;
                         if (diasVal === '0-7') matchDias = (rowDias >= 0 && rowDias <= 7);
                         else if (diasVal === '8-15') matchDias = (rowDias >= 8 && rowDias <= 15);
@@ -571,7 +502,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         else if (diasVal === '21+') matchDias = (rowDias > 20 && rowDias < 9999);
                         else if (diasVal === 'SEM') matchDias = (rowDias === 9999);
 
-                        // 4. Filtro Tipo de Veículo (CASE-INSENSITIVE + TRIM)
                         let matchVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
 
                         if (matchCard && matchText && matchDias && matchVeh) {{
@@ -722,9 +652,11 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 mime='text/csv'
             )
 
-# ==========================================
-# 7. RODAPÉ MARCA D'ÁGUA LIMPA
-# ==========================================
-img_footer_html = f'<img src="{img_shopito_entregador}" class="watermark-img">' if img_shopito_entregador else ''
-footer_html = f'''<div class="watermark-footer">{img_footer_html}<div class="watermark-text">Created by <strong>Pedro Heleno</strong><br>Fleet - LSP93</div></div>'''
+img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
+footer_html = f'''
+<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 15px;">
+    {img_footer_html}
+    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
+</div>
+'''
 st.markdown(footer_html, unsafe_allow_html=True)
