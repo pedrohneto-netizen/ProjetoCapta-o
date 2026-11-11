@@ -95,53 +95,45 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CACHE DE IMAGENS (LOGO OFICIAL FORMULA 1_2_2.JPG)
+# CACHE DE IMAGENS (LOCAL OU STREAMLIT CLOUD)
 # ==========================================
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
-def get_base64_image_cached(image_path_str):
-    if os.path.exists(image_path_str):
-        ext = os.path.splitext(image_path_str)[1].lower().replace('.', '')
-        mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
-        with open(image_path_str, 'rb') as img_file:
-            encoded = base64.b64encode(img_file.read()).decode('utf-8')
-            return f"data:image/{mime};base64,{encoded}"
+def get_base64_image_cached(image_filename):
+    # 1. Tenta buscar na raiz do projeto (Streamlit Cloud / GitHub)
+    possible_paths = [
+        Path(image_filename),
+        Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn') / image_filename
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            ext = path.suffix.lower().replace('.', '')
+            mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
+            with open(path, 'rb') as img_file:
+                encoded = base64.b64encode(img_file.read()).decode('utf-8')
+                return f"data:image/{mime};base64,{encoded}"
     return ''
 
-PATH_PROJECT = Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn')
-
-# Logo Oficial do Projeto
-img_logo_oficial = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2_2.jpg'))
+# Carregar Logo Oficial (Procura no GitHub ou Local)
+img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg')
 if not img_logo_oficial:
-    img_logo_oficial = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2.jpg'))
+    img_logo_oficial = get_base64_image_cached('Formula 1_2.jpg')
 
-img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
+img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
 
-# Menu Lateral LED Neon com a Logo Oficial
-sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else ''
+# ==========================================
+# MENU LATERAL LED NEON COMunsafe_allow_html=True
+# ==========================================
+sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo Oficial SPX">' if img_logo_oficial else '🏎️'
 
+# O parâmetro unsafe_allow_html=True impede que o HTML apareça como texto!
 st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
-    {sidebar_img_html}
+    <div style="text-align: center; margin-bottom: 8px;">{sidebar_img_html}</div>
     <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
     <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
 </div>
 """, unsafe_allow_html=True)
-
-opcao_menu = st.sidebar.radio(
-    "Navegação do Sistema:",
-    ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"],
-    index=0
-)
-
-st.sidebar.divider()
-st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
-
-if opcao_menu == "📅 Reengajamento & Reuniões":
-    if renderizar_modulo_reengajamento:
-        renderizar_modulo_reengajamento()
-    else:
-        st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
-    st.stop()
 
 # ==========================================
 # CÓDIGO DO DASHBOARD PRINCIPAL
