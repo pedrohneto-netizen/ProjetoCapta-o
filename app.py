@@ -5,15 +5,15 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
+import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento, registrar_acionamento_massa
+    from modulo_reengajamento import renderizar_modulo_reengajamento
 except ImportError:
     renderizar_modulo_reengajamento = None
-    registrar_acionamento_massa = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -23,6 +23,13 @@ st.set_page_config(
     page_icon="🧪",
     layout="wide",
 )
+
+# Inicializa sessão de navegação e compartilhamento de motoristas
+if "pagina_atual" not in st.session_state:
+    st.session_state["pagina_atual"] = "📊 Control Tower Churn"
+
+if "drivers_para_agendar" not in st.session_state:
+    st.session_state["drivers_para_agendar"] = []
 
 # Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
@@ -95,16 +102,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# CACHE DE IMAGENS (LOCAL OU STREAMLIT CLOUD)
-# ==========================================
+# Cache de Imagens
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_filename):
     possible_paths = [
         Path(image_filename),
         Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn') / image_filename
     ]
-    
     for path in possible_paths:
         if path.exists():
             ext = path.suffix.lower().replace('.', '')
@@ -114,16 +118,10 @@ def get_base64_image_cached(image_filename):
                 return f"data:image/{mime};base64,{encoded}"
     return ''
 
-# Carregar Logo Oficial (Procura no GitHub ou Local)
-img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg')
-if not img_logo_oficial:
-    img_logo_oficial = get_base64_image_cached('Formula 1_2.jpg')
-
+img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg') or get_base64_image_cached('Formula 1_2.jpg')
 img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
 
-# ==========================================
-# MENU LATERAL LED NEON (HTML CORRIGIDO)
-# ==========================================
+# MENU LATERAL LED NEON
 sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else '🏎️'
 
 st.sidebar.markdown(f"""
@@ -134,16 +132,21 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+opcoes_menu = ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"]
+
+# Atualiza rádio dinamicamente conforme estado da sessão
 opcao_menu = st.sidebar.radio(
     "Navegação do Sistema:",
-    ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"],
-    index=0
+    opcoes_menu,
+    index=opcoes_menu.index(st.session_state["pagina_atual"])
 )
+
+st.session_state["pagina_atual"] = opcao_menu
 
 st.sidebar.divider()
 st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
 
-if opcao_menu == "📅 Reengajamento & Reuniões":
+if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
     if renderizar_modulo_reengajamento:
         renderizar_modulo_reengajamento()
     else:
@@ -151,7 +154,7 @@ if opcao_menu == "📅 Reengajamento & Reuniões":
     st.stop()
 
 # ==========================================
-# CÓDIGO DO DASHBOARD PRINCIPAL
+# DASHBOARD PRINCIPAL
 # ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
@@ -181,7 +184,7 @@ def encontrar_colunas(cols):
     dt_col = next((c for c in cols if any(k in c.lower() for k in ['delivery date', 'route date', 'task date', 'created', 'date'])), None)
     return d_col, dt_col
 
-header_img_html = f'<img src="{img_logo_oficial}" style="height: 90px; filter: drop-shadow(0 0 10px rgba(238,77,45,0.6));" alt="Logo Oficial SPX">' if img_logo_oficial else '🏎️'
+header_img_html = f'<img src="{img_logo_oficial}" style="height: 90px; filter: drop-shadow(0 0 10px rgba(238,77,45,0.6));" alt="Logo SPX">' if img_logo_oficial else '🏎️'
 
 header_html = f'''
 <div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 20px rgba(238,77,45,0.3);">
@@ -208,6 +211,18 @@ with col_up2:
 
 data_ref = st.date_input('Data de Referência', value=datetime(2026, 11, 10))
 data_ref = datetime.combine(data_ref, datetime.min.time())
+
+# CAPTURA ENVIO VINDO DO HTML COMPONENT
+query_params = st.query_params
+if "payload_agendar" in query_params:
+    try:
+        dados_json = json.loads(query_params["payload_agendar"])
+        st.session_state["drivers_para_agendar"] = dados_json
+        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+        st.query_params.clear()
+        st.rerun()
+    except Exception:
+        pass
 
 st.divider()
 
@@ -247,32 +262,26 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                                 with z.open(filename) as f:
                                     sample = pd.read_csv(f, nrows=5, sep=None, engine='python')
                                     d_col, dt_col = encontrar_colunas(sample.columns.tolist())
-
                                     if not d_col or not dt_col:
                                         continue
-
                                     f.seek(0)
                                     for chunk in pd.read_csv(f, chunksize=200000, usecols=[d_col, dt_col], dtype={d_col: str}, on_bad_lines='skip', sep=None, engine='python'):
                                         chunk['ID_LIMPO'] = chunk[d_col].apply(converter_id_cientifico)
                                         chunk[dt_col] = pd.to_datetime(chunk[dt_col], dayfirst=True, errors='coerce')
                                         chunk = chunk.dropna(subset=['ID_LIMPO', dt_col])
-
                                         max_dates = chunk.groupby('ID_LIMPO')[dt_col].max()
                                         for d_id, dt in max_dates.items():
                                             if d_id not in dict_ultima_rota or dt > dict_ultima_rota[d_id]:
                                                 dict_ultima_rota[d_id] = dt
-
                     os.remove(tmp_path)
 
                 elif up_file.name.endswith('.csv'):
                     df_chunk = pd.read_csv(up_file, dtype=str, on_bad_lines='skip', sep=None, engine='python')
                     d_col, dt_col = encontrar_colunas(df_chunk.columns.tolist())
-
                     if d_col and dt_col:
                         df_chunk['ID_LIMPO'] = df_chunk[d_col].apply(converter_id_cientifico)
                         df_chunk[dt_col] = pd.to_datetime(df_chunk[dt_col], dayfirst=True, errors='coerce')
                         df_chunk = df_chunk.dropna(subset=['ID_LIMPO', dt_col])
-
                         max_dates = df_chunk.groupby('ID_LIMPO')[dt_col].max()
                         for d_id, dt in max_dates.items():
                             if d_id not in dict_ultima_rota or dt > dict_ultima_rota[d_id]:
@@ -328,35 +337,17 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 else:
                     badge = '<span style="background: rgba(158, 158, 158, 0.2); color: #B0BEC5; border: 1px solid #B0BEC5; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Sem Histórico</span>'
 
-                if d_phone_clean:
-                    copy_phone_btn = f'''
-                    <button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700; transition: all 0.2s;">
-                        📋 Copiar
-                    </button>
-                    '''
-                else:
-                    copy_phone_btn = '<span style="color: #777; font-size: 0.75rem;">Sem Whats</span>'
+                copy_phone_btn = f'''<button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700;">📋 Copiar</button>''' if d_phone_clean else '<span style="color: #777; font-size: 0.75rem;">Sem Whats</span>'
 
                 row_html = f'''
                 <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" data-phone="{d_phone_clean}" style="border-bottom: 1px solid #2D2D2D;">
                     <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox" onclick="atualizarContadorSelecao()"></td>
-                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
-                        {d_id}
-                        <button onclick="copiarTexto('{d_id}', this)" title="Copiar ID" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
-                    <td style="padding: 10px;">
-                        {d_name}
-                        <button onclick="copiarTexto('{d_name}', this)" title="Copiar Nome" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
+                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">{d_id}</td>
+                    <td style="padding: 10px;">{d_name}</td>
                     <td style="padding: 10px;"><span style="background: #252525; border: 1px solid #3A3A3A; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">{d_veh}</span></td>
                     <td style="padding: 10px; font-weight: 600; color: #FFF;">{d_dias_at}</td>
                     <td style="padding: 10px;">{badge}</td>
-                    <td style="padding: 10px; text-align: center;">
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                            <span style="font-size: 0.82rem;">{d_phone}</span>
-                            {copy_phone_btn}
-                        </div>
-                    </td>
+                    <td style="padding: 10px; text-align: center;">{copy_phone_btn}</td>
                 </tr>
                 '''
                 rows_list.append(row_html)
@@ -370,51 +361,18 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 <style>
                     body {{ background-color: #121212; color: #EEEEEE; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 10px; }}
                     .kpi-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }}
-                    .kpi-card {{
-                        background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer;
-                        transition: all 0.25s ease; position: relative; overflow: hidden;
-                    }}
-                    .kpi-card:hover {{ transform: translateY(-3px); border-color: #EE4D2D; box-shadow: 0 6px 15px rgba(238, 77, 45, 0.2); }}
-                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; box-shadow: 0 0 15px rgba(238, 77, 45, 0.4); }}
-                    .kpi-title {{ font-size: 0.75rem; text-transform: uppercase; color: #888888; font-weight: 700; letter-spacing: 0.5px; }}
+                    .kpi-card {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer; }}
+                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; }}
+                    .kpi-title {{ font-size: 0.75rem; text-transform: uppercase; color: #888888; font-weight: 700; }}
                     .kpi-num {{ font-size: 1.8rem; font-weight: 800; color: #FFF; margin-top: 5px; }}
-                    
                     .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
-                    .header-bar {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }}
-                    .section-title {{ color: #EE4D2D; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0; }}
-
-                    .filter-toolbar {{
-                        display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-                        background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px;
-                    }}
-
-                    .toolbar-group {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
-
-                    .action-btn {{
-                        background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px;
-                        font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
-                    }}
-                    .action-btn:hover {{ background: #333; border-color: #EE4D2D; color: #EE4D2D; }}
-
-                    .action-btn.primary {{
-                        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%); border: none; color: white;
-                    }}
-                    .action-btn.primary:hover {{ opacity: 0.9; transform: translateY(-1px); }}
-
-                    .search-input, .select-input {{
-                        background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px;
-                        font-size: 0.85rem; outline: none;
-                    }}
-                    .search-input:focus, .select-input:focus {{ border-color: #EE4D2D; }}
-
+                    .filter-toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px; }}
+                    .action-btn {{ background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }}
+                    .search-input, .select-input {{ background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; }}
                     table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
-                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; text-transform: uppercase; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
+                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; }}
                     tr:hover {{ background-color: #242424; }}
-                    
-                    .badge-selected {{
-                        background: rgba(238, 77, 45, 0.2); color: #EE4D2D; font-size: 0.78rem; font-weight: 700;
-                        padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D;
-                    }}
+                    .badge-selected {{ background: rgba(238, 77, 45, 0.2); color: #EE4D2D; padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D; }}
                 </style>
             </head>
             <body>
@@ -424,75 +382,44 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     <div class="kpi-title">🔍 Todos os Drivers</div>
                     <div class="kpi-num">{total:,}</div>
                 </div>
-                <div class="kpi-card" onclick="filtrarStatus('Ativo', this)">
-                    <div class="kpi-title" style="color: #00E676;">🟢 Operacionais (0 a 7d)</div>
-                    <div class="kpi-num" style="color: #00E676;">{c_op:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Alerta', this)">
-                    <div class="kpi-title" style="color: #FFD600;">🟡 Em Alerta (8 a 20d)</div>
-                    <div class="kpi-num" style="color: #FFD600;">{c_alt:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Churn', this)">
-                    <div class="kpi-title" style="color: #FF5252;">🔴 Inativos (>20d)</div>
-                    <div class="kpi-num" style="color: #FF5252;">{c_churn:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Sem Rotas', this)">
-                    <div class="kpi-title" style="color: #B0BEC5;">⚪ Sem Histórico AT</div>
-                    <div class="kpi-num" style="color: #B0BEC5;">{c_sem:,}</div>
-                </div>
+                <div class="kpi-card" onclick="filtrarStatus('Ativo', this)"><div class="kpi-title" style="color:#00E676;">🟢 Operacionais</div><div class="kpi-num" style="color:#00E676;">{c_op:,}</div></div>
+                <div class="kpi-card" onclick="filtrarStatus('Alerta', this)"><div class="kpi-title" style="color:#FFD600;">🟡 Em Alerta</div><div class="kpi-num" style="color:#FFD600;">{c_alt:,}</div></div>
+                <div class="kpi-card" onclick="filtrarStatus('Churn', this)"><div class="kpi-title" style="color:#FF5252;">🔴 Inativos (>20d)</div><div class="kpi-num" style="color:#FF5252;">{c_churn:,}</div></div>
+                <div class="kpi-card" onclick="filtrarStatus('Sem Rotas', this)"><div class="kpi-title" style="color:#B0BEC5;">⚪ Sem Histórico AT</div><div class="kpi-num" style="color:#B0BEC5;">{c_sem:,}</div></div>
             </div>
 
             <div class="table-container">
-                <div class="header-bar">
-                    <div class="section-title">📋 Detalhamento da Base de Motoristas</div>
-                    <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 280px;">
-                </div>
-
                 <div class="filter-toolbar">
-                    <div class="toolbar-group">
-                        <button onclick="aplicarFiltros()" class="action-btn primary">🔎 Pesquisar</button>
-
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar..." style="width: 200px;">
                         <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
-                            <option value="TODOS">⏱️ Dias sem AT: Todos</option>
-                            <option value="0-7">🟢 0 a 7 dias sem AT</option>
-                            <option value="8-15">🟡 8 a 15 dias sem AT</option>
-                            <option value="16-20">🟧 16 a 20 dias sem AT</option>
-                            <option value="21+">🔴 Mais de 20 dias (Churn)</option>
-                            <option value="SEM">⚪ Sem Histórico de Rotas</option>
+                            <option value="TODOS">⏱️ Dias: Todos</option>
+                            <option value="SEM">⚪ Sem Histórico</option>
                         </select>
-
-                        <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">
-                            {veiculos_options_html}
-                        </select>
-
-                        <button onclick="limparFiltros()" class="action-btn">🔄 Limpar Filtros</button>
+                        <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">{veiculos_options_html}</select>
                     </div>
 
-                    <div class="toolbar-group">
-                        <button onclick="acionarMassaWhatsApp()" class="action-btn primary" style="background: #00E676; color: #121212; border: none; font-weight: 800;">
-                            📲 Acionar Selecionados no WhatsApp <span id="lblSelecionados" class="badge-selected" style="background: #121212; color: #00E676; border-color: #00E676;">0</span>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="enviarParaAgendamento()" class="action-btn" style="background: #EE4D2D; color: white; border: none; font-weight: 800;">
+                            📅 Direcionar para Agendamento (<span id="lblSelecionados">0</span>)
                         </button>
-                        <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
-                        <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
                     </div>
                 </div>
 
-                <div style="overflow-x: auto; max-height: 520px; overflow-y: auto;">
+                <div style="overflow-x: auto; max-height: 500px;">
                     <table id="driversTable">
                         <thead>
                             <tr>
                                 <th style="text-align: center; width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
                                 <th>DRIVER ID</th>
-                                <th>NOME DO MOTORISTA</th>
+                                <th>NOME</th>
                                 <th>VEÍCULO</th>
-                                <th>DIAS SEM HISTÓRICO DE AT</th>
-                                <th>STATUS INATIVIDADE</th>
-                                <th style="text-align: center;">CONTATO / WHATSAPP</th>
+                                <th>DIAS SEM AT</th>
+                                <th>STATUS</th>
+                                <th style="text-align: center;">AÇÕES</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {table_rows}
-                        </tbody>
+                        <tbody>{table_rows}</tbody>
                     </table>
                 </div>
             </div>
@@ -500,67 +427,33 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             <script>
                 let currentCardStatus = 'TODOS';
 
-                function filtrarStatus(status, cardElement) {{
+                function filtrarStatus(status, el) {{
                     currentCardStatus = status;
-                    let cards = document.querySelectorAll('.kpi-card');
-                    cards.forEach(c => c.classList.remove('active'));
-                    cardElement.classList.add('active');
+                    document.querySelectorAll('.kpi-card').forEach(c => c.classList.remove('active'));
+                    el.classList.add('active');
                     aplicarFiltros();
                 }}
 
                 function aplicarFiltros() {{
-                    let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
-                    let diasVal = document.getElementById('diasFilter').value;
+                    let search = document.getElementById('searchInput').value.toLowerCase().trim();
                     let vehVal = document.getElementById('veiculoFilter').value.toUpperCase().trim();
                     let rows = document.querySelectorAll('#driversTable tbody tr');
 
                     rows.forEach(row => {{
                         let rowStatus = row.getAttribute('data-status');
-                        let rowDias = parseInt(row.getAttribute('data-dias'));
                         let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
                         let rowText = row.textContent.toLowerCase();
 
-                        let matchCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
-                        let matchText = (searchText === '') || rowText.includes(searchText);
+                        let mCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
+                        let mText = (search === '') || rowText.includes(search);
+                        let mVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
 
-                        let matchDias = true;
-                        if (diasVal === '0-7') matchDias = (rowDias >= 0 && rowDias <= 7);
-                        else if (diasVal === '8-15') matchDias = (rowDias >= 8 && rowDias <= 15);
-                        else if (diasVal === '16-20') matchDias = (rowDias >= 16 && rowDias <= 20);
-                        else if (diasVal === '21+') matchDias = (rowDias > 20 && rowDias < 9999);
-                        else if (diasVal === 'SEM') matchDias = (rowDias === 9999);
-
-                        let matchVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
-
-                        if (matchCard && matchText && matchDias && matchVeh) {{
-                            row.style.display = '';
-                        }} else {{
-                            row.style.display = 'none';
-                        }}
+                        row.style.display = (mCard && mText && mVeh) ? '' : 'none';
                     }});
                 }}
 
-                function limparFiltros() {{
-                    document.getElementById('searchInput').value = '';
-                    document.getElementById('diasFilter').value = 'TODOS';
-                    document.getElementById('veiculoFilter').value = 'TODOS';
-                    currentCardStatus = 'TODOS';
-                    
-                    let cards = document.querySelectorAll('.kpi-card');
-                    cards.forEach(c => c.classList.remove('active'));
-                    if(cards.length > 0) cards[0].classList.add('active');
-
-                    let checkboxes = document.querySelectorAll('.driver-checkbox');
-                    checkboxes.forEach(cb => cb.checked = false);
-                    document.getElementById('selectAll').checked = false;
-                    atualizarContadorSelecao();
-
-                    aplicarFiltros();
-                }}
-
                 function toggleSelectAll(masterCb) {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    rows.forEach(row => {{
+                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
                         if (row.style.display !== 'none') {{
                             let cb = row.querySelector('.driver-checkbox');
                             if(cb) cb.checked = masterCb.checked;
@@ -574,56 +467,34 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     document.getElementById('lblSelecionados').textContent = checked;
                 }}
 
-                function acionarMassaWhatsApp() {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
+                function enviarParaAgendamento() {{
                     let selecionados = [];
-
-                    rows.forEach(row => {{
+                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
                         let cb = row.querySelector('.driver-checkbox');
                         if (cb && cb.checked) {{
-                            let phone = row.getAttribute('data-phone');
-                            let name = row.getAttribute('data-name');
-                            if (phone && phone.length >= 10) {{
-                                selecionados.push({{ name: name, phone: phone }});
-                            }}
+                            selecionados.push({{
+                                id: row.getAttribute('data-id'),
+                                nome: row.getAttribute('data-name'),
+                                veh: row.getAttribute('data-veh'),
+                                phone: row.getAttribute('data-phone')
+                            }});
                         }}
                     }});
 
                     if (selecionados.length === 0) {{
-                        alert('Selecione pelo menos um motorista com telefone válido para acionar via WhatsApp!');
+                        alert('Selecione pelo menos 1 motorista para agendar!');
                         return;
                     }}
 
-                    let msgBase = encodeURIComponent("Olá! Notamos que você está inativo recentemente no galpão SPX. Gostamos de agendar uma reunião rápida de retorno às atividades!");
-                    
-                    selecionados.forEach(d => {{
-                        let url = "https://api.whatsapp.com/send?phone=" + d.phone + "&text=" + msgBase;
-                        window.open(url, '_blank');
-                    }});
+                    let jsonStr = encodeURIComponent(JSON.stringify(selecionados));
+                    window.parent.location.href = window.parent.location.pathname + '?payload_agendar=' + jsonStr;
                 }}
 
-                function copiarTexto(texto, btnElement) {{
+                function copiarTexto(texto, btn) {{
                     navigator.clipboard.writeText(texto).then(() => {{
-                        let orig = btnElement.innerHTML;
-                        btnElement.innerHTML = '✅ Copiado!';
-                        btnElement.style.background = '#00C853';
-                        setTimeout(() => {{ btnElement.innerHTML = orig; btnElement.style.background = ''; }}, 1500);
+                        btn.innerHTML = '✅ Copiado!';
+                        setTimeout(() => {{ btn.innerHTML = '📋 Copiar'; }}, 1200);
                     }});
-                }}
-
-                function copiarVisiveis(tipo) {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    let lista = [];
-
-                    rows.forEach(row => {{
-                        if (row.style.display !== 'none') {{
-                            let val = row.getAttribute('data-' + tipo);
-                            if (val) lista.push(val);
-                        }}
-                    }});
-
-                    if (lista.length === 0) return alert('Nenhum motorista visível!');
-                    navigator.clipboard.writeText(lista.join('\\n')).then(() => alert('✅ ' + lista.length + ' itens copiados!'));
                 }}
             </script>
             </body>
@@ -631,20 +502,3 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             '''
 
             components.html(html_component, height=730, scrolling=True)
-
-            csv_data = df_analise.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            st.download_button(
-                label='📥 BAIXAR RELATÓRIO COMPLETO (CSV)',
-                data=csv_data,
-                file_name='relatorio_churn_galpao.csv',
-                mime='text/csv'
-            )
-
-img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
-footer_html = f'''
-<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 15px;">
-    {img_footer_html}
-    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
-</div>
-'''
-st.markdown(footer_html, unsafe_allow_html=True)
