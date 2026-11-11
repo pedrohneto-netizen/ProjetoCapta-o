@@ -5,9 +5,9 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
+import urllib.parse
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 try:
     from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
@@ -25,10 +25,14 @@ st.set_page_config(
     layout="wide",
 )
 
+# Inicialização de Estados da Sessão
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "📊 Control Tower Churn"
 
-# Estilização Neon Fluorescente do Menu Lateral
+if "filtro_kpi_status" not in st.session_state:
+    st.session_state["filtro_kpi_status"] = "TODOS"
+
+# Estilização Neon Fluorescente do Menu e Cards Gerenciais
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
@@ -37,6 +41,7 @@ st.markdown("""
         --shopee-orange: #EE4D2D;
         --shopee-neon: #FF5722;
         --shopee-dark-bg: #121212;
+        --shopee-card-bg: #1E1E1E;
     }
 
     body, .main, .stApp {
@@ -45,6 +50,7 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
 
+    /* BARRA LATERAL LED NEON */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
         border-right: 2px solid var(--shopee-orange) !important;
@@ -85,6 +91,26 @@ st.markdown("""
         display: inline-block;
         margin-top: 4px;
         box-shadow: 0 0 8px #EE4D2D;
+    }
+
+    /* METRIC CARDS GERENCIAIS */
+    .metric-card-gerencial {
+        background: #1E1E1E;
+        border: 1px solid #2D2D2D;
+        border-radius: 12px;
+        padding: 14px 18px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: all 0.2s ease;
+    }
+    .metric-card-gerencial:hover {
+        border-color: #EE4D2D;
+        transform: translateY(-2px);
+    }
+    .metric-num {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-top: 4px;
     }
 
     .stRadio > label {
@@ -145,7 +171,7 @@ if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
     st.stop()
 
 # ==========================================
-# DASHBOARD PRINCIPAL
+# DASHBOARD PRINCIPAL - PAINEL GERENCIAL
 # ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
@@ -184,7 +210,7 @@ header_html = f'''
             <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
             <span style="background: #FFD600; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;">🧪 DEV</span>
         </div>
-        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel de Monitoramento e Disparo de Reagendamentos (LSP93)</div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Gerencial de Monitoramento e Disparo de Reagendamentos (LSP93)</div>
     </div>
     <div>{header_img_html}</div>
 </div>
@@ -205,11 +231,11 @@ data_ref = datetime.combine(data_ref, datetime.min.time())
 
 st.divider()
 
-if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
+if st.button('🚀 GERAR ANÁLISE E PAINEL GERENCIAL', type="primary", use_container_width=True):
     if not arquivo_drivers or not arquivos_rotas:
         st.error('Por favor, faça o upload das bases.')
     else:
-        with st.spinner('Processando dados...'):
+        with st.spinner('Processando inteligência de dados...'):
             try:
                 df_drivers = pd.read_csv(arquivo_drivers, sep=';', dtype=str, encoding='utf-8')
             except Exception:
@@ -287,288 +313,160 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
             df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
 
-            veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique()))) if col_veh_name in df_analise.columns else []
-            veiculos_options_html = '<option value="TODOS">🚗 Veículo: Todos</option>' + "".join([f'<option value="{v}">{v}</option>' for v in veiculos_unicos if v and v.lower() != 'nan'])
+            st.session_state["df_analise_cache"] = df_analise
+            st.session_state["col_driver_id_name"] = col_driver_id
+            st.session_state["col_veh_name"] = col_veh_name
+            st.toast("Painel de dados gerado com sucesso!", icon="✅")
 
-            total = len(df_analise)
-            c_op = len(df_analise[df_analise['Status_Inatividade'] == 'Ativo'])
-            c_alt = len(df_analise[df_analise['Status_Inatividade'] == 'Alerta'])
-            c_churn = len(df_analise[df_analise['Status_Inatividade'] == 'Churn'])
-            c_sem = len(df_analise[df_analise['Status_Inatividade'] == 'Sem Rotas'])
+# EXIBIÇÃO DO PAINEL GERENCIAL SE HOUVER DADOS PROCESSADOS
+if "df_analise_cache" in st.session_state:
+    df_analise = st.session_state["df_analise_cache"]
+    col_driver_id = st.session_state["col_driver_id_name"]
+    col_veh_name = st.session_state["col_veh_name"]
 
-            rows_list = []
-            for _, r in df_analise.iterrows():
-                d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
-                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
-                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '').strip()
-                d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
-                d_dias_at = r['Dias_Sem_AT_Fmt']
-                d_status = r['Status_Inatividade']
-                d_phone_clean = r['Telefone_Limpo']
+    # CARDS GERENCIAIS KPI
+    total = len(df_analise)
+    c_op = len(df_analise[df_analise['Status_Inatividade'] == 'Ativo'])
+    c_alt = len(df_analise[df_analise['Status_Inatividade'] == 'Alerta'])
+    c_churn = len(df_analise[df_analise['Status_Inatividade'] == 'Churn'])
+    c_sem = len(df_analise[df_analise['Status_Inatividade'] == 'Sem Rotas'])
 
-                if d_status == 'Ativo':
-                    badge = '<span style="background: rgba(0, 200, 83, 0.2); color: #00E676; border: 1px solid #00E676; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Ativo (0 a 7d)</span>'
-                elif d_status == 'Alerta':
-                    badge = '<span style="background: rgba(255, 171, 0, 0.2); color: #FFD600; border: 1px solid #FFD600; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Alerta (8 a 20d)</span>'
-                elif d_status == 'Churn':
-                    badge = '<span style="background: rgba(255, 61, 0, 0.2); color: #FF5252; border: 1px solid #FF5252; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Churn (>20d)</span>'
-                else:
-                    badge = '<span style="background: rgba(158, 158, 158, 0.2); color: #B0BEC5; border: 1px solid #B0BEC5; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Sem Histórico</span>'
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#AAA; font-size:0.8rem; font-weight:700;">🔍 TODOS OS DRIVERS</div><div class="metric-num" style="color:#FFF;">{total:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Todos", key="f_todos", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "TODOS"
+            st.rerun()
 
-                if d_phone_clean:
-                    url_wa_indiv = f"https://api.whatsapp.com/send?phone={d_phone_clean}"
-                    actions_cell = f'''
-                    <div style="display: flex; gap: 6px; align-items: center; justify-content: center;">
-                        <a href="{url_wa_indiv}" target="_blank" style="background: #25D366; color: #FFF; text-decoration: none; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">📲 Whats</a>
-                        <button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700;">📋 Tel</button>
-                    </div>
-                    '''
-                else:
-                    actions_cell = '<span style="color: #777; font-size: 0.75rem;">Sem Telefone</span>'
+    with k2:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#00E676; font-size:0.8rem; font-weight:700;">🟢 OPERACIONAIS</div><div class="metric-num" style="color:#00E676;">{c_op:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Ativos", key="f_op", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Ativo"
+            st.rerun()
 
-                row_html = f'''
-                <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" data-phone="{d_phone_clean}" style="border-bottom: 1px solid #2D2D2D;">
-                    <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox"></td>
-                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
-                        {d_id}
-                        <button onclick="copiarTexto('{d_id}', this)" title="Copiar ID" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
-                    <td style="padding: 10px;">
-                        {d_name}
-                        <button onclick="copiarTexto('{d_name}', this)" title="Copiar Nome" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
-                    <td style="padding: 10px;"><span style="background: #252525; border: 1px solid #3A3A3A; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">{d_veh}</span></td>
-                    <td style="padding: 10px; font-weight: 600; color: #FFF;">{d_dias_at}</td>
-                    <td style="padding: 10px;">{badge}</td>
-                    <td style="padding: 10px; text-align: center;">{actions_cell}</td>
-                </tr>
-                '''
-                rows_list.append(row_html)
+    with k3:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FFD600; font-size:0.8rem; font-weight:700;">🟡 EM ALERTA</div><div class="metric-num" style="color:#FFD600;">{c_alt:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Alerta", key="f_alt", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Alerta"
+            st.rerun()
 
-            table_rows = "".join(rows_list)
+    with k4:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FF5252; font-size:0.8rem; font-weight:700;">🔴 INATIVOS (CHURN)</div><div class="metric-num" style="color:#FF5252;">{c_churn:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Churn", key="f_churn", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Churn"
+            st.rerun()
 
-            html_component = f'''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{ background-color: #121212; color: #EEEEEE; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 10px; }}
-                    .kpi-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }}
-                    .kpi-card {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.25s ease; }}
-                    .kpi-card:hover {{ border-color: #EE4D2D; }}
-                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; box-shadow: 0 0 15px rgba(238, 77, 45, 0.4); }}
-                    .kpi-title {{ font-size: 0.75rem; text-transform: uppercase; color: #888888; font-weight: 700; }}
-                    .kpi-num {{ font-size: 1.8rem; font-weight: 800; color: #FFF; margin-top: 5px; }}
-                    .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
-                    .filter-toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px; }}
-                    .action-btn {{ background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
-                    .action-btn:hover {{ border-color: #EE4D2D; color: #EE4D2D; }}
-                    .search-input, .select-input {{ background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }}
-                    table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
-                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
-                    tr:hover {{ background-color: #242424; }}
-                </style>
-            </head>
-            <body>
+    with k5:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#B0BEC5; font-size:0.8rem; font-weight:700;">⚪ SEM HISTÓRICO</div><div class="metric-num" style="color:#B0BEC5;">{c_sem:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Sem Rotas", key="f_sem", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Sem Rotas"
+            st.rerun()
 
-            <div class="kpi-grid">
-                <div class="kpi-card active" onclick="filtrarStatus('TODOS', this)">
-                    <div class="kpi-title">🔍 Todos os Drivers</div>
-                    <div class="kpi-num">{total:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Ativo', this)"><div class="kpi-title" style="color:#00E676;">🟢 Operacionais</div><div class="kpi-num" style="color:#00E676;">{c_op:,}</div></div>
-                <div class="kpi-card" onclick="filtrarStatus('Alerta', this)"><div class="kpi-title" style="color:#FFD600;">🟡 Em Alerta</div><div class="kpi-num" style="color:#FFD600;">{c_alt:,}</div></div>
-                <div class="kpi-card" onclick="filtrarStatus('Churn', this)"><div class="kpi-title" style="color:#FF5252;">🔴 Inativos (>20d)</div><div class="kpi-num" style="color:#FF5252;">{c_churn:,}</div></div>
-                <div class="kpi-card" onclick="filtrarStatus('Sem Rotas', this)"><div class="kpi-title" style="color:#B0BEC5;">⚪ Sem Histórico AT</div><div class="kpi-num" style="color:#B0BEC5;">{c_sem:,}</div></div>
-            </div>
+    st.markdown("<br>", unsafe_allow_html=True)
 
-            <div class="table-container">
-                <div class="filter-toolbar">
-                    <div style="display:flex; gap:8px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome..." style="width: 220px;">
-                        <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
-                            <option value="TODOS">⏱️ Dias: Todos</option>
-                            <option value="0-7">🟢 0 a 7 dias</option>
-                            <option value="8-15">🟡 8 a 15 dias</option>
-                            <option value="16-20">🟧 16 a 20 dias</option>
-                            <option value="21+">🔴 >20 dias (Churn)</option>
-                            <option value="SEM">⚪ Sem Histórico</option>
-                        </select>
-                        <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">{veiculos_options_html}</select>
-                        <button onclick="limparFiltros()" class="action-btn">🔄 Limpar</button>
-                    </div>
+    # FILTROS DE BUSCA E TIPO DE VEÍCULO
+    f_col1, f_col2, f_col3 = st.columns([2, 1.5, 1])
+    with f_col1:
+        busca_texto = st.text_input("🔍 Busca Rápida (Nome ou ID)", "")
+    with f_col2:
+        veiculos_unicos = ["TODOS"] + sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique())))
+        veh_selecionado = st.selectbox("🚗 Tipo de Veículo", veiculos_unicos)
+    with f_col3:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Resetar Filtros", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "TODOS"
+            st.rerun()
 
-                    <div style="display:flex; gap:8px; align-items: center;">
-                        <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
-                        <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
-                    </div>
-                </div>
+    # APLICAÇÃO DOS FILTROS NA BASE EXIBIDA
+    df_exibir = df_analise.copy()
+    if st.session_state["filtro_kpi_status"] != "TODOS":
+        df_exibir = df_exibir[df_exibir["Status_Inatividade"] == st.session_state["filtro_kpi_status"]]
 
-                <div style="overflow-x: auto; max-height: 500px;">
-                    <table id="driversTable">
-                        <thead>
-                            <tr>
-                                <th style="text-align: center; width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
-                                <th>DRIVER ID</th>
-                                <th>NOME DO MOTORISTA</th>
-                                <th>VEÍCULO</th>
-                                <th>DIAS SEM HISTÓRICO DE AT</th>
-                                <th>STATUS INATIVIDADE</th>
-                                <th style="text-align: center;">AÇÕES INDIVIDUAIS</th>
-                            </tr>
-                        </thead>
-                        <tbody>{table_rows}</tbody>
-                    </table>
-                </div>
-            </div>
+    if veh_selecionado != "TODOS":
+        df_exibir = df_exibir[df_exibir[col_veh_name] == veh_selecionado]
 
-            <script>
-                let currentCardStatus = 'TODOS';
+    if busca_texto:
+        termo = busca_texto.lower()
+        df_exibir = df_exibir[
+            df_exibir[col_driver_id].astype(str).str.lower().str.contains(termo) |
+            df_exibir["Driver Name"].astype(str).str.lower().str.contains(termo)
+        ]
 
-                function filtrarStatus(status, el) {{
-                    currentCardStatus = status;
-                    document.querySelectorAll('.kpi-card').forEach(c => c.classList.remove('active'));
-                    el.classList.add('active');
-                    aplicarFiltros();
-                }}
+    st.markdown(f"### 📋 Tabela Gerencial de Operação (`{len(df_exibir)} motoristas filtrados`)")
 
-                function aplicarFiltros() {{
-                    let search = document.getElementById('searchInput').value.toLowerCase().trim();
-                    let diasVal = document.getElementById('diasFilter').value;
-                    let vehVal = document.getElementById('veiculoFilter').value.toUpperCase().trim();
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
+    # PREPARAÇÃO DA TABELA NATIVA COM COLUNA DE WHATSAPP DIRETO
+    df_tabela = pd.DataFrame()
+    df_tabela["Selecionar"] = False
+    df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
+    df_tabela["Nome do Motorista"] = df_exibir["Driver Name"].astype(str)
+    df_tabela["Veículo"] = df_exibir[col_veh_name].astype(str)
+    df_tabela["Inatividade"] = df_exibir["Dias_Sem_AT_Fmt"]
+    df_tabela["Status"] = df_exibir["Status_Inatividade"]
+    df_tabela["WhatsApp"] = df_exibir["Telefone_Limpo"].apply(
+        lambda p: f"https://api.whatsapp.com/send?phone={p}" if p else ""
+    )
 
-                    rows.forEach(row => {{
-                        let rowStatus = row.getAttribute('data-status');
-                        let rowDias = parseInt(row.getAttribute('data-dias'));
-                        let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
-                        let rowText = row.textContent.toLowerCase();
+    df_editado_tabela = st.data_editor(
+        df_tabela,
+        column_config={
+            "Selecionar": st.column_config.CheckboxColumn("Acionar", default=False),
+            "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
+            "Nome do Motorista": st.column_config.TextColumn("Nome do Motorista", disabled=True),
+            "Veículo": st.column_config.TextColumn("Veículo", disabled=True),
+            "Inatividade": st.column_config.TextColumn("Dias Sem AT", disabled=True),
+            "Status": st.column_config.TextColumn("Status", disabled=True),
+            "WhatsApp": st.column_config.LinkColumn("📲 Disparo Direto", display_text="Abrir Whats")
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="tabela_gerencial_drivers"
+    )
 
-                        let mCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
-                        let mText = (search === '') || rowText.includes(search);
-                        let mVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
+    # PROCESSAMENTO DE ACIONAMENTO EM MASSA DAS LINHAS CHECADAS
+    drivers_marcados = df_editado_tabela[df_editado_tabela["Selecionar"] == True]
 
-                        let mDias = true;
-                        if (diasVal === '0-7') mDias = (rowDias >= 0 && rowDias <= 7);
-                        else if (diasVal === '8-15') mDias = (rowDias >= 8 && rowDias <= 15);
-                        else if (diasVal === '16-20') mDias = (rowDias >= 16 && rowDias <= 20);
-                        else if (diasVal === '21+') mDias = (rowDias > 20 && rowDias < 9999);
-                        else if (diasVal === 'SEM') mDias = (rowDias === 9999);
+    st.markdown("---")
+    st.markdown("### 🚀 Central de Disparo em Massa & Reagendamento")
+    
+    col_m1, col_m2 = st.columns([2, 1])
+    with col_m1:
+        st.info(f"📍 **{len(drivers_marcados)} motorista(s)** selecionado(s) na tabela acima para envio em massa.")
+    with col_m2:
+        dt_ag = st.date_input("Data da Reunião", value=datetime.now())
+        hr_ag = st.time_input("Horário da Reunião", value=datetime.now().time())
 
-                        row.style.display = (mCard && mText && mVeh && mDias) ? '' : 'none';
-                    }});
-                }}
+    pauta_ag = st.selectbox("Pauta Principal", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
+    link_ag = st.text_input("Link da Reunião (Meet / Teams)", "https://meet.google.com/spx-fleet-lsp93")
 
-                function limparFiltros() {{
-                    document.getElementById('searchInput').value = '';
-                    document.getElementById('diasFilter').value = 'TODOS';
-                    document.getElementById('veiculoFilter').value = 'TODOS';
-                    currentCardStatus = 'TODOS';
-                    document.querySelectorAll('.kpi-card').forEach(c => c.classList.remove('active'));
-                    document.querySelectorAll('.kpi-card')[0].classList.add('active');
-                    document.querySelectorAll('.driver-checkbox').forEach(cb => cb.checked = false);
-                    document.getElementById('selectAll').checked = false;
-                    aplicarFiltros();
-                }}
+    if st.button("📲 ENVIAR SELECIONADOS PARA O AGENDAMENTO & REUNIÕES", type="primary", use_container_width=True):
+        if drivers_marcados.empty:
+            st.warning("Marque pelo menos 1 motorista no checkbox 'Acionar' da tabela acima!")
+        else:
+            novos_registros = []
+            agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-                function toggleSelectAll(masterCb) {{
-                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
-                        if (row.style.display !== 'none') {{
-                            let cb = row.querySelector('.driver-checkbox');
-                            if(cb) cb.checked = masterCb.checked;
-                        }}
-                    }});
-                }}
+            for _, r in drivers_marcados.iterrows():
+                phone_raw = r["WhatsApp"].replace("https://api.whatsapp.com/send?phone=", "")
+                novos_registros.append({
+                    "Driver ID": str(r["Driver ID"]),
+                    "Nome": str(r["Nome do Motorista"]),
+                    "Telefone": phone_raw,
+                    "Veiculo": str(r["Veículo"]),
+                    "Data Acionamento": agora_str,
+                    "Data Reunião": dt_ag.strftime("%d/%m/%Y"),
+                    "Horário": hr_ag.strftime("%H:%M"),
+                    "Status": "Aguardando Reunião",
+                    "Observação": f"Pauta: {pauta_ag} | Link: {link_ag}"
+                })
 
-                function copiarTexto(texto, btnElement) {{
-                    navigator.clipboard.writeText(texto).then(() => {{
-                        let orig = btnElement.innerHTML;
-                        btnElement.innerHTML = '✅ Copiado!';
-                        btnElement.style.background = '#00C853';
-                        setTimeout(() => {{ btnElement.innerHTML = orig; btnElement.style.background = ''; }}, 1400);
-                    }});
-                }}
+            if novos_registros and salvar_historico and carregar_historico:
+                df_h = carregar_historico()
+                df_f = pd.concat([pd.DataFrame(novos_registros), df_h], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
+                salvar_historico(df_f)
 
-                function copiarVisiveis(tipo) {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    let lista = [];
-                    rows.forEach(row => {{
-                        if (row.style.display !== 'none') {{
-                            let val = row.getAttribute('data-' + tipo);
-                            if (val) lista.push(val);
-                        }}
-                    }});
-                    if (lista.length === 0) return alert('Nenhum item visível!');
-                    navigator.clipboard.writeText(lista.join('\\n')).then(() => alert('✅ ' + lista.length + ' itens copiados!'));
-                }}
-            </script>
-            </body>
-            </html>
-            '''
-
-            components.html(html_component, height=660, scrolling=True)
-
-            # ==========================================
-            # PAINEL NATIVO DE SELEÇÃO E REDIRECIONAMENTO (SEM ERRO DE URL)
-            # ==========================================
-            st.markdown("### 📲 Central de Acionamento & Agendamento em Massa")
-            st.caption("Selecione os motoristas da lista para disparar o acionamento e registrar no histórico:")
-
-            opcoes_drivers = [
-                f"{r[col_driver_id]} - {r.get('Driver Name', 'Motorista')} ({r['Telefone_Limpo']})"
-                for _, r in df_analise.iterrows() if r['Telefone_Limpo']
-            ]
-
-            drivers_selecionados = st.multiselect(
-                "Motoristas a serem acionados:",
-                options=opcoes_drivers,
-                default=[],
-                help="Pesquise por nome ou ID para adicionar à lista de agendamento."
-            )
-
-            col_a1, col_a2 = st.columns(2)
-            with col_a1:
-                dt_agenda = st.date_input("Data da Reunião", value=datetime.now())
-                hr_agenda = st.time_input("Horário da Reunião", value=datetime.now().time())
-            with col_a2:
-                pauta_agenda = st.selectbox("Pauta da Reunião", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
-                link_agenda = st.text_input("Link da Reunião", "https://meet.google.com/spx-fleet-lsp93")
-
-            if st.button("🚀 REGISTRAR AGENDAMENTO E IR PARA GERENCIADOR DE ENVIOS", type="primary", use_container_width=True):
-                if not drivers_selecionados:
-                    st.warning("Selecione pelo menos 1 motorista na caixa acima para continuar!")
-                else:
-                    novos_registros = []
-                    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-                    for item in drivers_selecionados:
-                        p = item.split(" - ")
-                        d_id = p[0]
-                        sub_p = p[1].split(" (")
-                        d_name = sub_p[0]
-                        d_phone = sub_p[1].replace(")", "")
-
-                        novos_registros.append({
-                            "Driver ID": d_id,
-                            "Nome": d_name,
-                            "Telefone": d_phone,
-                            "Veiculo": "N/I",
-                            "Data Acionamento": agora_str,
-                            "Data Reunião": dt_agenda.strftime("%d/%m/%Y"),
-                            "Horário": hr_agenda.strftime("%H:%M"),
-                            "Status": "Aguardando Reunião",
-                            "Observação": f"Pauta: {pauta_agenda} | Link: {link_agenda}"
-                        })
-
-                    if novos_registros and salvar_historico and carregar_historico:
-                        df_hist_atual = carregar_historico()
-                        df_final_hist = pd.concat([pd.DataFrame(novos_registros), df_hist_atual], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
-                        salvar_historico(df_final_hist)
-
-                        # Redireciona para o menu de Agendamento nativamente
-                        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-                        st.toast("✅ Reuniões registradas com sucesso!", icon="🚀")
-                        st.rerun()
+                st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+                st.toast("✅ Reuniões agendadas! Redirecionando...", icon="🚀")
+                st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
 footer_html = f'''
