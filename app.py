@@ -16,11 +16,11 @@ except ImportError:
     renderizar_modulo_reengajamento = None
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA & MENU LATERAL
+# 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
 # ==========================================
 st.set_page_config(
-    page_title="Shopee SPX - Control Tower Churn",
-    page_icon="🚚",
+    page_title="[DEV] SPX - Control Tower Churn", # Aba do navegador
+    page_icon="🧪",                                # Ícone de laboratório/teste
     layout="wide",
 )
 
@@ -146,10 +146,13 @@ else:
     header_img_html = '<div style="font-size: 3rem;">🏎️</div>'
 
 header_html = f'''
-<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
+<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #FFD600; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
     <div>
-        <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
-        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Inteligente de Monitoramento e Reengajamento de Motoristas de Fleet</div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</span>
+            <span style="background: #FFD600; color: #121212; font-weight: 800; padding: 4px 12px; border-radius: 8px; font-size: 0.85rem; letter-spacing: 1px;">🧪 AMBIENTE DEV / STAGING</span>
+        </div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Ambiente de Homologação e Teste de Novas Funcionalidades (LSP93)</div>
     </div>
     <div>{header_img_html}</div>
 </div>
