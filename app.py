@@ -11,11 +11,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
+    from modulo_reengajamento import renderizar_modulo_reengajamento
 except ImportError:
     renderizar_modulo_reengajamento = None
-    salvar_historico = None
-    carregar_historico = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -28,6 +26,24 @@ st.set_page_config(
 
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "📊 Control Tower Churn"
+
+if "drivers_para_agendar" not in st.session_state:
+    st.session_state["drivers_para_agendar"] = []
+
+# CAPTURA O AGENDAMENTO EM MASSA VIA PARÂMETROS
+query_params = st.query_params
+if "payload_agendar" in query_params:
+    try:
+        raw_payload = query_params["payload_agendar"]
+        if isinstance(raw_payload, list):
+            raw_payload = raw_payload[0]
+        dados_json = json.loads(raw_payload)
+        st.session_state["drivers_para_agendar"] = dados_json
+        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+        st.query_params.clear()
+        st.rerun()
+    except Exception:
+        pass
 
 # Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
@@ -46,7 +62,6 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
 
-    /* BARRA LATERAL ESTILO LED NEON */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
         border-right: 2px solid var(--shopee-orange) !important;
@@ -92,10 +107,6 @@ st.markdown("""
     .stRadio > label {
         color: #FFF !important;
         font-weight: 700 !important;
-    }
-
-    .stRadio div[role="radiogroup"] > label:hover {
-        color: var(--shopee-orange) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -310,7 +321,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
                 d_dias_at = r['Dias_Sem_AT_Fmt']
                 d_status = r['Status_Inatividade']
-                d_phone = r.get(col_phone, '') if col_phone else 'Não informado'
                 d_phone_clean = r['Telefone_Limpo']
 
                 if d_status == 'Ativo':
@@ -322,7 +332,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 else:
                     badge = '<span style="background: rgba(158, 158, 158, 0.2); color: #B0BEC5; border: 1px solid #B0BEC5; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Sem Histórico</span>'
 
-                # Ações Individuais (WhatsApp + Cópias)
                 if d_phone_clean:
                     url_wa_indiv = f"https://api.whatsapp.com/send?phone={d_phone_clean}"
                     actions_cell = f'''
@@ -371,12 +380,11 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     .filter-toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px; }}
                     .action-btn {{ background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
                     .action-btn:hover {{ border-color: #EE4D2D; color: #EE4D2D; }}
-                    .action-btn.primary {{ background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%); border: none; color: white; font-weight: 800; }}
                     .search-input, .select-input {{ background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }}
                     table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
                     th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
                     tr:hover {{ background-color: #242424; }}
-                    .badge-selected {{ background: rgba(238, 77, 45, 0.2); color: #EE4D2D; font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D; }}
+                    .badge-selected {{ background: #121212; color: #00E676; font-size: 0.78rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; border: 1px solid #00E676; }}
                 </style>
             </head>
             <body>
@@ -395,7 +403,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             <div class="table-container">
                 <div class="filter-toolbar">
                     <div style="display:flex; gap:8px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 240px;">
+                        <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome..." style="width: 220px;">
                         <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
                             <option value="TODOS">⏱️ Dias: Todos</option>
                             <option value="0-7">🟢 0 a 7 dias</option>
@@ -408,7 +416,10 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                         <button onclick="limparFiltros()" class="action-btn">🔄 Limpar</button>
                     </div>
 
-                    <div style="display:flex; gap:8px;">
+                    <div style="display:flex; gap:8px; align-items: center;">
+                        <button onclick="enviarParaAgendamento()" class="action-btn" style="background: #00E676; color: #121212; border: none; font-weight: 800; padding: 8px 16px;">
+                            📅 Enviar Selecionados para Agendamento & Reunião (<span id="lblSelecionados" class="badge-selected">0</span>)
+                        </button>
                         <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
                         <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
                     </div>
@@ -494,7 +505,30 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
                 function atualizarContadorSelecao() {{
                     let checked = document.querySelectorAll('.driver-checkbox:checked').length;
-                    let btn = window.parent.document.querySelector('button[key="btn_massa_trigger"]');
+                    document.getElementById('lblSelecionados').textContent = checked;
+                }}
+
+                function enviarParaAgendamento() {{
+                    let selecionados = [];
+                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
+                        let cb = row.querySelector('.driver-checkbox');
+                        if (cb && cb.checked) {{
+                            selecionados.push({{
+                                id: row.getAttribute('data-id'),
+                                nome: row.getAttribute('data-name'),
+                                veh: row.getAttribute('data-veh'),
+                                phone: row.getAttribute('data-phone')
+                            }});
+                        }}
+                    }});
+
+                    if (selecionados.length === 0) {{
+                        alert('Marque pelo menos 1 motorista na tabela para enviar ao agendamento!');
+                        return;
+                    }}
+
+                    let jsonStr = encodeURIComponent(JSON.stringify(selecionados));
+                    window.parent.location.href = window.parent.location.pathname + '?payload_agendar=' + jsonStr;
                 }}
 
                 function copiarTexto(texto, btnElement) {{
@@ -524,64 +558,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             '''
 
             components.html(html_component, height=710, scrolling=True)
-
-            # ==========================================
-            # PAINEL DE DISPARO EM MASSA / REUNIÃO (STREAMLIT NATIVO)
-            # ==========================================
-            st.markdown("### 📲 Acionamento & Agendamento de Reunião em Massa")
-            st.caption("Selecione os motoristas desejados na tabela acima para agendar o disparo coletivo:")
-
-            # Seleção direta no Streamlit para garantir estabilidade do botão de envio
-            drivers_opcoes = [f"{r[col_driver_id]} - {r.get('Driver Name', 'Motorista')} ({r['Telefone_Limpo']})" for _, r in df_analise.iterrows() if r['Telefone_Limpo']]
-            
-            selecionados_massa = st.multiselect(
-                "Motoristas selecionados para o disparo em massa:",
-                options=drivers_opcoes,
-                default=drivers_opcoes[:5] if len(drivers_opcoes) >= 5 else drivers_opcoes
-            )
-
-            c_box1, c_box2 = st.columns(2)
-            with c_box1:
-                dt_reuniao = st.date_input("Data Agendada para Reunião", value=datetime.now())
-                hr_reuniao = st.time_input("Horário da Reunião", value=datetime.now().time())
-            with c_box2:
-                pauta_reuniao = st.selectbox("Pauta Principal", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
-                link_reuniao = st.text_input("Link da Reunião (Meet/Teams)", "https://meet.google.com/spx-fleet-lsp93")
-
-            if st.button("🚀 REGISTRAR AGENDAMENTO E IR PARA GERENCIADOR DE ENVIOS", type="primary"):
-                if not selecionados_massa:
-                    st.warning("Selecione pelo menos 1 motorista na caixa acima.")
-                else:
-                    novos = []
-                    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-                    
-                    for item in selecionados_massa:
-                        partes = item.split(" - ")
-                        d_id = partes[0]
-                        sub_partes = partes[1].split(" (")
-                        d_name = sub_partes[0]
-                        d_phone = sub_partes[1].replace(")", "")
-                        
-                        novos.append({
-                            "Driver ID": d_id,
-                            "Nome": d_name,
-                            "Telefone": d_phone,
-                            "Veiculo": "N/I",
-                            "Data Acionamento": agora_str,
-                            "Data Reunião": dt_reuniao.strftime("%d/%m/%Y"),
-                            "Horário": hr_reuniao.strftime("%H:%M"),
-                            "Status": "Aguardando Reunião",
-                            "Observação": f"Pauta: {pauta_reuniao} | Link: {link_reuniao}"
-                        })
-                    
-                    if novos and salvar_historico and carregar_historico:
-                        df_h = carregar_historico()
-                        df_f = pd.concat([pd.DataFrame(novos), df_h], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
-                        salvar_historico(df_f)
-                        
-                        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-                        st.toast("✅ Reuniões registradas no histórico!", icon="🚀")
-                        st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
 footer_html = f'''
