@@ -5,32 +5,34 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
+import urllib.parse
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Importação do novo módulo isolado
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento
+    from modulo_reengajamento import renderizar_modulo_reengajamento, registrar_acionamento_massa
 except ImportError:
     renderizar_modulo_reengajamento = None
+    registrar_acionamento_massa = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
 # ==========================================
 st.set_page_config(
-    page_title="[DEV] SPX - Control Tower Churn", # Aba do navegador
-    page_icon="🧪",                                # Ícone de laboratório/teste
+    page_title="[DEV] SPX - Control Tower Churn",
+    page_icon="🧪",
     layout="wide",
 )
 
-# Estilização da Barra Lateral no Tema Shopee Black
+# Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
     
     :root {
         --shopee-orange: #EE4D2D;
+        --shopee-neon: #FF5722;
         --shopee-dark-bg: #121212;
     }
 
@@ -40,52 +42,80 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
 
-    /* Menu Lateral */
+    /* BARRA LATERAL ESTILO LED NEON */
     [data-testid="stSidebar"] {
-        background-color: #1A1A1A !important;
-        border-right: 1px solid #2D2D2D !important;
+        background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
+        border-right: 2px solid var(--shopee-orange) !important;
+        box-shadow: 4px 0 20px rgba(238, 77, 45, 0.25) !important;
+    }
+
+    .sidebar-neon-card {
+        background: #1E1E1E;
+        border: 1px solid var(--shopee-orange);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 20px;
+        box-shadow: 0 0 12px rgba(238, 77, 45, 0.35);
+        text-align: center;
     }
 
     .sidebar-title {
-        color: #EE4D2D;
+        color: #FFFFFF;
         font-weight: 800;
-        font-size: 1.2rem;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+    }
+
+    .sidebar-badge {
+        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%);
+        color: white;
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+        display: inline-block;
+        margin-top: 4px;
+        box-shadow: 0 0 8px #EE4D2D;
     }
 
     .stRadio > label {
-        color: #FFFFFF !important;
-        font-weight: 600;
+        color: #FFF !important;
+        font-weight: 700 !important;
+    }
+
+    .stRadio div[role="radiogroup"] > label:hover {
+        color: var(--shopee-orange) !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Menu Lateral de Navegação
-st.sidebar.markdown('<div class="sidebar-title">🚚 SPX NAVIGATION</div>', unsafe_allow_html=True)
+# Menu Lateral LED Neon
+st.sidebar.markdown("""
+<div class="sidebar-neon-card">
+    <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
+    <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
+</div>
+""", unsafe_allow_html=True)
+
 opcao_menu = st.sidebar.radio(
-    "Selecione o Módulo:",
+    "Navegação do Sistema:",
     ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"],
     index=0
 )
 
 st.sidebar.divider()
-st.sidebar.caption("SPX Logistics - Fleet LSP93\nVersão 2.0 (Ambiente DEV)")
+st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
 
-# Se o usuário selecionar a aba de Reengajamento:
 if opcao_menu == "📅 Reengajamento & Reuniões":
     if renderizar_modulo_reengajamento:
         renderizar_modulo_reengajamento()
     else:
-        st.error("O arquivo 'modulo_reengajamento.py' não foi encontrado na pasta do projeto.")
+        st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
     st.stop()
 
 # ==========================================
-# CÓDIGO ATUAL DO DASHBOARD PRINCIPAL
+# CÓDIGO DO DASHBOARD PRINCIPAL
 # ==========================================
-
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_path_str):
     if os.path.exists(image_path_str):
@@ -97,19 +127,7 @@ def get_base64_image_cached(image_path_str):
     return ''
 
 PATH_PROJECT = Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn')
-
-img_kart_src = ''
-possible_kart_files = [
-    'Formula 1_2.jpg', 'Formula 1_2.png', 'Formula 1_2.jpeg',
-    'Formula 1.jpg', 'Formula 1.png', 'Formula 1.jpeg',
-    'Shopito Kart.jpg', 'Shopito Kart.png'
-]
-
-for fn in possible_kart_files:
-    img_kart_src = get_base64_image_cached(str(PATH_PROJECT / fn))
-    if img_kart_src:
-        break
-
+img_kart_src = get_base64_image_cached(str(PATH_PROJECT / 'Formula 1_2.jpg'))
 img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
 
 def converter_id_cientifico(val):
@@ -140,19 +158,16 @@ def encontrar_colunas(cols):
     dt_col = next((c for c in cols if any(k in c.lower() for k in ['delivery date', 'route date', 'task date', 'created', 'date'])), None)
     return d_col, dt_col
 
-if img_kart_src:
-    header_img_html = f'<img src="{img_kart_src}" style="height: 90px;" alt="Shopito Kart">'
-else:
-    header_img_html = '<div style="font-size: 3rem;">🏎️</div>'
+header_img_html = f'<img src="{img_kart_src}" style="height: 90px;" alt="Shopito">' if img_kart_src else '🏎️'
 
 header_html = f'''
-<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #FFD600; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
+<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 20px rgba(238,77,45,0.3);">
     <div>
         <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</span>
-            <span style="background: #FFD600; color: #121212; font-weight: 800; padding: 4px 12px; border-radius: 8px; font-size: 0.85rem; letter-spacing: 1px;">🧪 AMBIENTE DEV / STAGING</span>
+            <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
+            <span style="background: #FFD600; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;">🧪 DEV</span>
         </div>
-        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Ambiente de Homologação e Teste de Novas Funcionalidades (LSP93)</div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel de Monitoramento e Disparo de Reagendamentos (LSP93)</div>
     </div>
     <div>{header_img_html}</div>
 </div>
@@ -162,22 +177,22 @@ st.markdown(header_html, unsafe_allow_html=True)
 col_up1, col_up2 = st.columns(2)
 with col_up1:
     st.subheader('1. Base de Motoristas')
-    arquivo_drivers = st.file_uploader('Faça o upload do CSV de motoristas do Galpão', type=['csv'])
+    arquivo_drivers = st.file_uploader('Upload CSV motoristas', type=['csv'])
 
 with col_up2:
     st.subheader('2. Histórico de Rotas (ZIP ou CSV)')
-    arquivos_rotas = st.file_uploader('Faça o upload dos arquivos ZIP ou CSV com o histórico de rotas', type=['zip', 'csv'], accept_multiple_files=True)
+    arquivos_rotas = st.file_uploader('Upload histórico rotas', type=['zip', 'csv'], accept_multiple_files=True)
 
-data_ref = st.date_input('Data de Referência da Análise', value=datetime(2026, 11, 10))
+data_ref = st.date_input('Data de Referência', value=datetime(2026, 11, 10))
 data_ref = datetime.combine(data_ref, datetime.min.time())
 
 st.divider()
 
 if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
     if not arquivo_drivers or not arquivos_rotas:
-        st.error('Por favor, faça o upload da base de motoristas (.csv) e do histórico de rotas (.zip ou .csv).')
+        st.error('Por favor, faça o upload das bases.')
     else:
-        with st.spinner('Processando dados e preparando o painel gerencial...'):
+        with st.spinner('Processando dados...'):
             try:
                 df_drivers = pd.read_csv(arquivo_drivers, sep=';', dtype=str, encoding='utf-8')
             except Exception:
@@ -300,7 +315,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     copy_phone_btn = '<span style="color: #777; font-size: 0.75rem;">Sem Whats</span>'
 
                 row_html = f'''
-                <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" style="border-bottom: 1px solid #2D2D2D;">
+                <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" data-phone="{d_phone_clean}" style="border-bottom: 1px solid #2D2D2D;">
                     <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox" onclick="atualizarContadorSelecao()"></td>
                     <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
                         {d_id}
@@ -342,13 +357,8 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     .kpi-num {{ font-size: 1.8rem; font-weight: 800; color: #FFF; margin-top: 5px; }}
                     
                     .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
-                    
-                    .header-bar {{
-                        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
-                    }}
-                    .section-title {{
-                        color: #EE4D2D; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;
-                    }}
+                    .header-bar {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }}
+                    .section-title {{ color: #EE4D2D; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0; }}
 
                     .filter-toolbar {{
                         display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
@@ -417,9 +427,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
                 <div class="filter-toolbar">
                     <div class="toolbar-group">
-                        <button onclick="aplicarFiltros()" class="action-btn primary">
-                            🔎 Pesquisar
-                        </button>
+                        <button onclick="aplicarFiltros()" class="action-btn primary">🔎 Pesquisar</button>
 
                         <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
                             <option value="TODOS">⏱️ Dias sem AT: Todos</option>
@@ -434,21 +442,15 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                             {veiculos_options_html}
                         </select>
 
-                        <button onclick="limparFiltros()" class="action-btn" title="Restaurar visualização original">
-                            🔄 Limpar Filtros
-                        </button>
+                        <button onclick="limparFiltros()" class="action-btn">🔄 Limpar Filtros</button>
                     </div>
 
                     <div class="toolbar-group">
-                        <button onclick="copiarVisiveis('id')" class="action-btn primary" title="Copiar apenas os IDs visíveis">
-                            📋 Copiar IDs (Visíveis)
+                        <button onclick="acionarMassaWhatsApp()" class="action-btn primary" style="background: #00E676; color: #121212; border: none; font-weight: 800;">
+                            📲 Acionar Selecionados no WhatsApp <span id="lblSelecionados" class="badge-selected" style="background: #121212; color: #00E676; border-color: #00E676;">0</span>
                         </button>
-                        <button onclick="copiarVisiveis('name')" class="action-btn" title="Copiar apenas os Nomes visíveis">
-                            📋 Copiar Nomes (Visíveis)
-                        </button>
-                        <button onclick="copiarSelecionados()" class="action-btn" title="Copiar itens marcados pelas caixas de seleção">
-                            ✅ Copiar Selecionados <span id="lblSelecionados" class="badge-selected">0</span>
-                        </button>
+                        <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
+                        <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
                     </div>
                 </div>
 
@@ -549,50 +551,41 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     document.getElementById('lblSelecionados').textContent = checked;
                 }}
 
-                function copiarParaClipboard(texto) {{
-                    if (navigator.clipboard && window.isSecureContext) {{
-                        return navigator.clipboard.writeText(texto).catch(err => {{
-                            return fallbackCopiar(texto);
-                        }});
-                    }} else {{
-                        return fallbackCopiar(texto);
-                    }}
-                }}
+                function acionarMassaWhatsApp() {{
+                    let rows = document.querySelectorAll('#driversTable tbody tr');
+                    let selecionados = [];
 
-                function fallbackCopiar(texto) {{
-                    return new Promise((resolve, reject) => {{
-                        let textArea = document.createElement("textarea");
-                        textArea.value = texto;
-                        textArea.style.position = "fixed";
-                        textArea.style.left = "-999999px";
-                        textArea.style.top = "-999999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        try {{
-                            let successful = document.execCommand('copy');
-                            document.body.removeChild(textArea);
-                            if (successful) resolve(); else reject(new Error('Copy failed'));
-                        }} catch (err) {{
-                            document.body.removeChild(textArea);
-                            reject(err);
+                    rows.forEach(row => {{
+                        let cb = row.querySelector('.driver-checkbox');
+                        if (cb && cb.checked) {{
+                            let phone = row.getAttribute('data-phone');
+                            let name = row.getAttribute('data-name');
+                            if (phone && phone.length >= 10) {{
+                                selecionados.push({{ name: name, phone: phone }});
+                            }}
                         }}
+                    }});
+
+                    if (selecionados.length === 0) {{
+                        alert('Selecione pelo menos um motorista com telefone válido para acionar via WhatsApp!');
+                        return;
+                    }}
+
+                    let msgBase = encodeURIComponent("Olá! Notamos que você está inativo recentemente no galpão SPX. Gostamos de agendar uma reunião rápida de retorno às atividades!");
+                    
+                    selecionados.forEach(d => {{
+                        let url = "https://api.whatsapp.com/send?phone=" + d.phone + "&text=" + msgBase;
+                        window.open(url, '_blank');
                     }});
                 }}
 
                 function copiarTexto(texto, btnElement) {{
-                    copiarParaClipboard(texto).then(() => {{
-                        let originalText = btnElement.innerHTML;
+                    navigator.clipboard.writeText(texto).then(() => {{
+                        let orig = btnElement.innerHTML;
                         btnElement.innerHTML = '✅ Copiado!';
                         btnElement.style.background = '#00C853';
-                        btnElement.style.color = '#FFF';
-
-                        setTimeout(() => {{
-                            btnElement.innerHTML = originalText;
-                            btnElement.style.background = '';
-                            btnElement.style.color = '';
-                        }}, 1500);
-                    }}).catch(err => alert('Copie manualmente: ' + texto));
+                        setTimeout(() => {{ btnElement.innerHTML = orig; btnElement.style.background = ''; }}, 1500);
+                    }});
                 }}
 
                 function copiarVisiveis(tipo) {{
@@ -602,43 +595,12 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     rows.forEach(row => {{
                         if (row.style.display !== 'none') {{
                             let val = row.getAttribute('data-' + tipo);
-                            if (val && val !== 'null' && val !== 'undefined') lista.push(val);
+                            if (val) lista.push(val);
                         }}
                     }});
 
-                    if (lista.length === 0) {{
-                        alert('Nenhum motorista visível para copiar!');
-                        return;
-                    }}
-
-                    let textoFinal = lista.join('\\n');
-                    copiarParaClipboard(textoFinal).then(() => {{
-                        alert('✅ ' + lista.length + ' ' + (tipo === 'id' ? 'IDs' : 'Nomes') + ' copiados para a área de transferência!');
-                    }}).catch(err => alert('Erro ao copiar lista!'));
-                }}
-
-                function copiarSelecionados() {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    let lista = [];
-
-                    rows.forEach(row => {{
-                        let cb = row.querySelector('.driver-checkbox');
-                        if (cb && cb.checked) {{
-                            let id = row.getAttribute('data-id');
-                            let name = row.getAttribute('data-name');
-                            lista.push(id + ' - ' + name);
-                        }}
-                    }});
-
-                    if (lista.length === 0) {{
-                        alert('Selecione pelo menos um motorista usando as caixas de seleção!');
-                        return;
-                    }}
-
-                    let textoFinal = lista.join('\\n');
-                    copiarParaClipboard(textoFinal).then(() => {{
-                        alert('✅ ' + lista.length + ' motoristas selecionados copiados para a área de transferência!');
-                    }}).catch(err => alert('Erro ao copiar selecionados!'));
+                    if (lista.length === 0) return alert('Nenhum motorista visível!');
+                    navigator.clipboard.writeText(lista.join('\\n')).then(() => alert('✅ ' + lista.length + ' itens copiados!'));
                 }}
             </script>
             </body>
