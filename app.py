@@ -5,15 +5,16 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
-import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento
+    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
 except ImportError:
     renderizar_modulo_reengajamento = None
+    salvar_historico = None
+    carregar_historico = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -26,24 +27,6 @@ st.set_page_config(
 
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "📊 Control Tower Churn"
-
-if "drivers_para_agendar" not in st.session_state:
-    st.session_state["drivers_para_agendar"] = []
-
-# CAPTURA O AGENDAMENTO EM MASSA VIA PARÂMETROS
-query_params = st.query_params
-if "payload_agendar" in query_params:
-    try:
-        raw_payload = query_params["payload_agendar"]
-        if isinstance(raw_payload, list):
-            raw_payload = raw_payload[0]
-        dados_json = json.loads(raw_payload)
-        st.session_state["drivers_para_agendar"] = dados_json
-        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-        st.query_params.clear()
-        st.rerun()
-    except Exception:
-        pass
 
 # Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
@@ -345,7 +328,7 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
 
                 row_html = f'''
                 <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" data-phone="{d_phone_clean}" style="border-bottom: 1px solid #2D2D2D;">
-                    <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox" onclick="atualizarContadorSelecao()"></td>
+                    <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox"></td>
                     <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
                         {d_id}
                         <button onclick="copiarTexto('{d_id}', this)" title="Copiar ID" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
@@ -384,7 +367,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
                     th {{ background: #181818; color: #EE4D2D; font-weight: 700; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
                     tr:hover {{ background-color: #242424; }}
-                    .badge-selected {{ background: #121212; color: #00E676; font-size: 0.78rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; border: 1px solid #00E676; }}
                 </style>
             </head>
             <body>
@@ -417,9 +399,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     </div>
 
                     <div style="display:flex; gap:8px; align-items: center;">
-                        <button onclick="enviarParaAgendamento()" class="action-btn" style="background: #00E676; color: #121212; border: none; font-weight: 800; padding: 8px 16px;">
-                            📅 Enviar Selecionados para Agendamento & Reunião (<span id="lblSelecionados" class="badge-selected">0</span>)
-                        </button>
                         <button onclick="copiarVisiveis('id')" class="action-btn">📋 Copiar IDs</button>
                         <button onclick="copiarVisiveis('name')" class="action-btn">📋 Copiar Nomes</button>
                     </div>
@@ -489,7 +468,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                     document.querySelectorAll('.kpi-card')[0].classList.add('active');
                     document.querySelectorAll('.driver-checkbox').forEach(cb => cb.checked = false);
                     document.getElementById('selectAll').checked = false;
-                    atualizarContadorSelecao();
                     aplicarFiltros();
                 }}
 
@@ -500,35 +478,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                             if(cb) cb.checked = masterCb.checked;
                         }}
                     }});
-                    atualizarContadorSelecao();
-                }}
-
-                function atualizarContadorSelecao() {{
-                    let checked = document.querySelectorAll('.driver-checkbox:checked').length;
-                    document.getElementById('lblSelecionados').textContent = checked;
-                }}
-
-                function enviarParaAgendamento() {{
-                    let selecionados = [];
-                    document.querySelectorAll('#driversTable tbody tr').forEach(row => {{
-                        let cb = row.querySelector('.driver-checkbox');
-                        if (cb && cb.checked) {{
-                            selecionados.push({{
-                                id: row.getAttribute('data-id'),
-                                nome: row.getAttribute('data-name'),
-                                veh: row.getAttribute('data-veh'),
-                                phone: row.getAttribute('data-phone')
-                            }});
-                        }}
-                    }});
-
-                    if (selecionados.length === 0) {{
-                        alert('Marque pelo menos 1 motorista na tabela para enviar ao agendamento!');
-                        return;
-                    }}
-
-                    let jsonStr = encodeURIComponent(JSON.stringify(selecionados));
-                    window.parent.location.href = window.parent.location.pathname + '?payload_agendar=' + jsonStr;
                 }}
 
                 function copiarTexto(texto, btnElement) {{
@@ -557,7 +506,69 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             </html>
             '''
 
-            components.html(html_component, height=710, scrolling=True)
+            components.html(html_component, height=660, scrolling=True)
+
+            # ==========================================
+            # PAINEL NATIVO DE SELEÇÃO E REDIRECIONAMENTO (SEM ERRO DE URL)
+            # ==========================================
+            st.markdown("### 📲 Central de Acionamento & Agendamento em Massa")
+            st.caption("Selecione os motoristas da lista para disparar o acionamento e registrar no histórico:")
+
+            opcoes_drivers = [
+                f"{r[col_driver_id]} - {r.get('Driver Name', 'Motorista')} ({r['Telefone_Limpo']})"
+                for _, r in df_analise.iterrows() if r['Telefone_Limpo']
+            ]
+
+            drivers_selecionados = st.multiselect(
+                "Motoristas a serem acionados:",
+                options=opcoes_drivers,
+                default=[],
+                help="Pesquise por nome ou ID para adicionar à lista de agendamento."
+            )
+
+            col_a1, col_a2 = st.columns(2)
+            with col_a1:
+                dt_agenda = st.date_input("Data da Reunião", value=datetime.now())
+                hr_agenda = st.time_input("Horário da Reunião", value=datetime.now().time())
+            with col_a2:
+                pauta_agenda = st.selectbox("Pauta da Reunião", ["Reintegração de Base Dormente", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
+                link_agenda = st.text_input("Link da Reunião", "https://meet.google.com/spx-fleet-lsp93")
+
+            if st.button("🚀 REGISTRAR AGENDAMENTO E IR PARA GERENCIADOR DE ENVIOS", type="primary", use_container_width=True):
+                if not drivers_selecionados:
+                    st.warning("Selecione pelo menos 1 motorista na caixa acima para continuar!")
+                else:
+                    novos_registros = []
+                    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+                    for item in drivers_selecionados:
+                        p = item.split(" - ")
+                        d_id = p[0]
+                        sub_p = p[1].split(" (")
+                        d_name = sub_p[0]
+                        d_phone = sub_p[1].replace(")", "")
+
+                        novos_registros.append({
+                            "Driver ID": d_id,
+                            "Nome": d_name,
+                            "Telefone": d_phone,
+                            "Veiculo": "N/I",
+                            "Data Acionamento": agora_str,
+                            "Data Reunião": dt_agenda.strftime("%d/%m/%Y"),
+                            "Horário": hr_agenda.strftime("%H:%M"),
+                            "Status": "Aguardando Reunião",
+                            "Observação": f"Pauta: {pauta_agenda} | Link: {link_agenda}"
+                        })
+
+                    if novos_registros and salvar_historico and carregar_historico:
+                        df_hist_atual = carregar_historico()
+                        df_final_hist = pd.concat([pd.DataFrame(novos_registros), df_hist_atual], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
+                        salvar_historico(df_final_hist)
+
+                        # Redireciona para o menu de Agendamento nativamente
+                        st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+                        st.toast("✅ Reuniões registradas com sucesso!", icon="🚀")
+                        st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
 footer_html = f'''
