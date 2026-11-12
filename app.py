@@ -5,17 +5,20 @@ from pathlib import Path
 import re
 import tempfile
 import zipfile
-import urllib.parse
 import pandas as pd
 import streamlit as st
 
 try:
-    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico, registrar_ou_atualizar_driver
+    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
 except ImportError:
     renderizar_modulo_reengajamento = None
     salvar_historico = None
     carregar_historico = None
-    registrar_ou_atualizar_driver = None
+
+try:
+    from modulo_assistente_ia import renderizar_modulo_ia
+except ImportError:
+    renderizar_modulo_ia = None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
@@ -32,8 +35,8 @@ if "pagina_atual" not in st.session_state:
 if "filtro_kpi_status" not in st.session_state:
     st.session_state["filtro_kpi_status"] = "TODOS"
 
-if "marcar_todos_state" not in st.session_state:
-    st.session_state["marcar_todos_state"] = False
+if "drivers_para_agendar" not in st.session_state:
+    st.session_state["drivers_para_agendar"] = []
 
 # Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
@@ -146,7 +149,14 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-opcoes_menu = ["📊 Control Tower Churn", "📅 Reengajamento & Reuniões"]
+opcoes_menu = [
+    "📊 Control Tower Churn",
+    "📅 Reengajamento & Reuniões",
+    "🤖 Assistente IA (SPX Copilot)"
+]
+
+if st.session_state["pagina_atual"] not in opcoes_menu:
+    st.session_state["pagina_atual"] = opcoes_menu[0]
 
 opcao_menu = st.sidebar.radio(
     "Navegação do Sistema:",
@@ -159,6 +169,7 @@ st.session_state["pagina_atual"] = opcao_menu
 st.sidebar.divider()
 st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
 
+# ROTEAMENTO DAS PÁGINAS SECUNDÁRIAS
 if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
     if renderizar_modulo_reengajamento:
         renderizar_modulo_reengajamento()
@@ -166,8 +177,15 @@ if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
         st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
     st.stop()
 
+if st.session_state["pagina_atual"] == "🤖 Assistente IA (SPX Copilot)":
+    if renderizar_modulo_ia:
+        renderizar_modulo_ia()
+    else:
+        st.error("Módulo 'modulo_assistente_ia.py' não encontrado. Crie o arquivo na raiz do projeto.")
+    st.stop()
+
 # ==========================================
-# DASHBOARD PRINCIPAL - PAINEL GERENCIAL
+# DASHBOARD PRINCIPAL
 # ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
@@ -389,16 +407,9 @@ if "df_analise_cache" in st.session_state:
 
     st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
 
-    # BOTÃO PARA MARCAR/DESMARCAR TODOS
-    col_t1, col_t2 = st.columns([1.5, 3.5])
-    with col_t1:
-        if st.button("✅ Selecionar Todos / Inverter Seleção"):
-            st.session_state["marcar_todos_state"] = not st.session_state["marcar_todos_state"]
-            st.rerun()
-
-    # PREPARAÇÃO DA TABELA NATIVA
+    # PREPARAÇÃO DA TABELA NATIVA COM SELEÇÃO ESTÁVEL
     df_tabela = pd.DataFrame()
-    df_tabela["Acionar"] = st.session_state["marcar_todos_state"]
+    df_tabela["Acionar"] = False
     df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
     df_tabela["Nome do Motorista"] = df_exibir["Driver Name"].astype(str)
     df_tabela["Veículo"] = df_exibir[col_veh_name].astype(str)
@@ -419,7 +430,7 @@ if "df_analise_cache" in st.session_state:
             "Inatividade": st.column_config.TextColumn("Dias Sem AT", disabled=True),
             "Status": st.column_config.TextColumn("Status", disabled=True),
             "Telefone": st.column_config.TextColumn("Contato Tel", disabled=True),
-            "WhatsApp": st.column_config.LinkColumn("📲 Disparo Direto", display_text="Abrir Whats")
+            "WhatsApp": st.column_config.LinkColumn("📲 Whats Individual", display_text="Abrir Whats")
         },
         hide_index=True,
         use_container_width=True,
@@ -429,37 +440,34 @@ if "df_analise_cache" in st.session_state:
     drivers_marcados = df_editado_tabela[df_editado_tabela["Acionar"] == True]
 
     st.markdown("---")
-    st.markdown("### 📍 Configuração do Treinamento Presencial & Disparo em Massa")
+    st.markdown("### 📍 Configuração do Treinamento Presencial & Transferência de Fila")
     
     col_e1, col_e2, col_e3 = st.columns([2, 1, 1])
     with col_e1:
-        endereco_hub_input = st.text_input("📍 Endereço do HUB / Local do Treinamento Presencial", "Av. Industrial, 1000 - Galpão SPX - Santo André / SP")
+        endereco_hub_input = st.text_input("📍 Endereço do HUB / Local do Treinamento", "Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP")
     with col_e2:
         dt_ag = st.date_input("Data do Treinamento", value=datetime.now())
     with col_e3:
         hr_ag = st.time_input("Horário do Treinamento", value=datetime.now().time())
 
-    pauta_ag = st.selectbox("Pauta do Treinamento", ["Reintegração & Capacitação Presencial", "Alinhamento de Rotas/Galpão", "Aumento de Carga / Migração"])
-
-    if st.button(f"📲 AGENDAR TREINAMENTO PRESENCIAL E GERAR FILA ({len(drivers_marcados)} selecionados)", type="primary", use_container_width=True):
+    if st.button(f"📅 DIRECIONAR {len(drivers_marcados)} MOTORISTA(S) SELECIONADO(S) PARA O AGENDAMENTO", type="primary", use_container_width=True):
         if drivers_marcados.empty:
-            st.warning("Selecione pelo menos 1 motorista na tabela acima!")
+            st.warning("Selecione pelo menos 1 motorista na caixa 'Acionar em Massa' da tabela acima!")
         else:
             novos_registros = []
             agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
             for _, r in drivers_marcados.iterrows():
-                phone_raw = r["Telefone"]
                 novos_registros.append({
                     "Driver ID": str(r["Driver ID"]),
                     "Nome": str(r["Nome do Motorista"]),
-                    "Telefone": phone_raw,
+                    "Telefone": str(r["Telefone"]),
                     "Veiculo": str(r["Veículo"]),
                     "Data Acionamento": agora_str,
                     "Data Reunião": dt_ag.strftime("%d/%m/%Y"),
                     "Horário": hr_ag.strftime("%H:%M"),
                     "Status": "Aguardando Reunião",
-                    "Endereço HUB / Pauta": f"{endereco_hub_input} ({pauta_ag})"
+                    "Endereço HUB / Pauta": endereco_hub_input
                 })
 
             if novos_registros and salvar_historico and carregar_historico:
@@ -467,8 +475,9 @@ if "df_analise_cache" in st.session_state:
                 df_f = pd.concat([pd.DataFrame(novos_registros), df_h], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
                 salvar_historico(df_f)
 
+                st.session_state["drivers_para_agendar"] = novos_registros
                 st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
-                st.toast("✅ Reuniões presenciais registradas!", icon="🚀")
+                st.toast("✅ Fila enviada para o módulo de agendamentos!", icon="🚀")
                 st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
