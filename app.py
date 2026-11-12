@@ -7,56 +7,46 @@ import tempfile
 import zipfile
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
+
+try:
+    from modulo_reengajamento import renderizar_modulo_reengajamento, salvar_historico, carregar_historico
+except ImportError:
+    renderizar_modulo_reengajamento = None
+    salvar_historico = None
+    carregar_historico = None
+
+try:
+    from modulo_assistente_ia import renderizar_modulo_ia
+except ImportError:
+    renderizar_modulo_ia = None
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (STREAMLIT)
+# 1. CONFIGURAÇÃO DA PÁGINA (AMBIENTE DEV)
 # ==========================================
 st.set_page_config(
-    page_title="Shopee SPX - Control Tower Churn",
-    page_icon="🚚",
+    page_title="[DEV] SPX - Control Tower Churn",
+    page_icon="🧪",
     layout="wide",
 )
 
-@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
-def get_base64_image_cached(image_path_str):
-    if os.path.exists(image_path_str):
-        ext = os.path.splitext(image_path_str)[1].lower().replace('.', '')
-        mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
-        with open(image_path_str, 'rb') as img_file:
-            encoded = base64.b64encode(img_file.read()).decode('utf-8')
-            return f"data:image/{mime};base64,{encoded}"
-    return ''
+if "pagina_atual" not in st.session_state:
+    st.session_state["pagina_atual"] = "📊 Control Tower Churn"
 
-PATH_PROJECT = Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn')
+if "filtro_kpi_status" not in st.session_state:
+    st.session_state["filtro_kpi_status"] = "TODOS"
 
-img_kart_src = ''
-possible_kart_files = [
-    'Formula 1_2.jpg', 'Formula 1_2.png', 'Formula 1_2.jpeg',
-    'Formula 1.jpg', 'Formula 1.png', 'Formula 1.jpeg',
-    'Shopito Kart.jpg', 'Shopito Kart.png'
-]
+if "drivers_para_agendar" not in st.session_state:
+    st.session_state["drivers_para_agendar"] = []
 
-for fn in possible_kart_files:
-    img_kart_src = get_base64_image_cached(str(PATH_PROJECT / fn))
-    if img_kart_src:
-        break
-
-img_shopito_entregador = get_base64_image_cached(str(PATH_PROJECT / 'GIF-21-entregador.jpg'))
-
-# ==========================================
-# 2. ESTILIZAÇÃO CSS & LAYOUT SHOPEE BLACK
-# ==========================================
+# Estilização Neon Fluorescente do Menu Lateral
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
     
     :root {
         --shopee-orange: #EE4D2D;
-        --shopee-orange-hover: #FF5722;
+        --shopee-neon: #FF5722;
         --shopee-dark-bg: #121212;
-        --shopee-card-bg: #1E1E1E;
-        --shopee-border: #2D2D2D;
     }
 
     body, .main, .stApp {
@@ -65,107 +55,138 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
+        border-right: 2px solid var(--shopee-orange) !important;
+        box-shadow: 4px 0 20px rgba(238, 77, 45, 0.25) !important;
     }
 
-    .shopee-header-container {
-        background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%);
-        border-bottom: 3px solid var(--shopee-orange);
-        padding: 18px 30px;
-        border-radius: 16px;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 8px 25px rgba(238, 77, 45, 0.25);
-        animation: fadeIn 0.5s ease-in-out;
+    .sidebar-neon-card {
+        background: #1E1E1E;
+        border: 1px solid var(--shopee-orange);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 20px;
+        box-shadow: 0 0 12px rgba(238, 77, 45, 0.35);
+        text-align: center;
     }
 
-    .shopee-title {
-        color: #FFFFFF !important;
-        font-size: 2.1rem !important;
-        font-weight: 800 !important;
-        margin: 0 !important;
+    .sidebar-logo {
+        max-height: 80px;
+        width: auto;
+        margin-bottom: 8px;
+        filter: drop-shadow(0 0 8px rgba(238, 77, 45, 0.5));
+    }
+
+    .sidebar-title {
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 1.1rem;
         letter-spacing: 0.5px;
     }
 
-    .shopee-subtitle {
-        color: #DDDDDD;
-        font-size: 0.95rem;
+    .sidebar-badge {
+        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%);
+        color: white;
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+        display: inline-block;
+        margin-top: 4px;
+        box-shadow: 0 0 8px #EE4D2D;
+    }
+
+    .metric-card-gerencial {
+        background: #1E1E1E;
+        border: 1px solid #2D2D2D;
+        border-radius: 12px;
+        padding: 14px 18px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .metric-num {
+        font-size: 1.8rem;
+        font-weight: 800;
         margin-top: 4px;
     }
 
-    .header-kart-img {
-        height: 90px;
-        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
-        transition: transform 0.3s ease;
-    }
-
-    .header-kart-img:hover {
-        transform: scale(1.05);
-    }
-
-    .stButton>button {
-        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%) !important;
-        color: white !important;
+    .stRadio > label {
+        color: #FFF !important;
         font-weight: 700 !important;
-        font-size: 1.05rem !important;
-        border-radius: 10px !important;
-        border: none !important;
-        padding: 12px 28px !important;
-        width: 100% !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.3) !important;
-    }
-
-    .stButton>button:hover {
-        transform: translateY(-2px) scale(1.005) !important;
-        box-shadow: 0 6px 20px rgba(255, 87, 34, 0.5) !important;
-    }
-
-    .watermark-footer {
-        margin-top: 45px;
-        padding: 18px 25px;
-        background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%);
-        border: 1px solid rgba(238, 77, 45, 0.3);
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        pointer-events: none;
-    }
-
-    .watermark-text {
-        color: #AAAAAA;
-        font-size: 0.95rem;
-        letter-spacing: 0.5px;
-        text-align: center;
-        line-height: 1.4;
-    }
-
-    .watermark-text strong {
-        color: #EE4D2D;
-        font-weight: 700;
-    }
-
-    .watermark-img {
-        height: 55px;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4));
-        opacity: 0.9;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Cache de Imagens
+@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
+def get_base64_image_cached(image_filename):
+    possible_paths = [
+        Path(image_filename),
+        Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn') / image_filename
+    ]
+    for path in possible_paths:
+        if path.exists():
+            ext = path.suffix.lower().replace('.', '')
+            mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
+            with open(path, 'rb') as img_file:
+                encoded = base64.b64encode(img_file.read()).decode('utf-8')
+                return f"data:image/{mime};base64,{encoded}"
+    return ''
+
+img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg') or get_base64_image_cached('Formula 1_2.jpg')
+img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
+
+# MENU LATERAL LED NEON
+sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else '🏎️'
+
+st.sidebar.markdown(f"""
+<div class="sidebar-neon-card">
+    <div style="text-align: center; margin-bottom: 8px;">{sidebar_img_html}</div>
+    <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
+    <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
+</div>
+""", unsafe_allow_html=True)
+
+opcoes_menu = [
+    "📊 Control Tower Churn",
+    "📅 Reengajamento & Reuniões",
+    "🤖 Assistente IA (SPX Copilot)"
+]
+
+# Garante índice válido caso a sessão venha de uma versão anterior
+if st.session_state["pagina_atual"] not in opcoes_menu:
+    st.session_state["pagina_atual"] = opcoes_menu[0]
+
+opcao_menu = st.sidebar.radio(
+    "Navegação do Sistema:",
+    opcoes_menu,
+    index=opcoes_menu.index(st.session_state["pagina_atual"])
+)
+
+st.session_state["pagina_atual"] = opcao_menu
+
+st.sidebar.divider()
+st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
+
+# ROTEAMENTO DAS PÁGINAS SECUNDÁRIAS
+if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
+    if renderizar_modulo_reengajamento:
+        renderizar_modulo_reengajamento()
+    else:
+        st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
+    st.stop()
+
+if st.session_state["pagina_atual"] == "🤖 Assistente IA (SPX Copilot)":
+    if renderizar_modulo_ia:
+        renderizar_modulo_ia()
+    else:
+        st.error("Módulo 'modulo_assistente_ia.py' não encontrado. Crie o arquivo na raiz do projeto.")
+    st.stop()
+
 # ==========================================
-# 3. FUNÇÕES DE TRATAMENTO DE DADOS
+# DASHBOARD PRINCIPAL
 # ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
@@ -195,43 +216,41 @@ def encontrar_colunas(cols):
     dt_col = next((c for c in cols if any(k in c.lower() for k in ['delivery date', 'route date', 'task date', 'created', 'date'])), None)
     return d_col, dt_col
 
-# ==========================================
-# 4. CABEÇALHO PERSONALIZADO COM SHOPITO KART
-# ==========================================
-if img_kart_src:
-    header_img_html = f'<img src="{img_kart_src}" class="header-kart-img" alt="Shopito Kart">'
-else:
-    header_img_html = '<div style="font-size: 3rem;">🏎️</div>'
+header_img_html = f'<img src="{img_logo_oficial}" style="height: 90px; filter: drop-shadow(0 0 10px rgba(238,77,45,0.6));" alt="Logo SPX">' if img_logo_oficial else '🏎️'
 
-header_html = f'''<div class="shopee-header-container"><div><div class="shopee-title">SPX LOGISTICS - CONTROL TOWER CHURN</div><div class="shopee-subtitle">Painel Inteligente de Monitoramento e Reengajamento de Motoristas de Fleet</div></div><div>{header_img_html}</div></div>'''
+header_html = f'''
+<div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 20px rgba(238,77,45,0.3);">
+    <div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
+            <span style="background: #FFD600; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;">🧪 DEV</span>
+        </div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Gerencial de Monitoramento e Disparo de Reagendamentos (LSP93)</div>
+    </div>
+    <div>{header_img_html}</div>
+</div>
+'''
 st.markdown(header_html, unsafe_allow_html=True)
 
-# ==========================================
-# 5. UPLOAD DE ARQUIVOS
-# ==========================================
 col_up1, col_up2 = st.columns(2)
-
 with col_up1:
     st.subheader('1. Base de Motoristas')
-    arquivo_drivers = st.file_uploader('Faça o upload do CSV de motoristas do Galpão', type=['csv'])
+    arquivo_drivers = st.file_uploader('Upload CSV motoristas', type=['csv'])
 
 with col_up2:
     st.subheader('2. Histórico de Rotas (ZIP ou CSV)')
-    arquivos_rotas = st.file_uploader('Faça o upload dos arquivos ZIP ou CSV com o histórico de rotas', type=['zip', 'csv'], accept_multiple_files=True)
+    arquivos_rotas = st.file_uploader('Upload histórico rotas', type=['zip', 'csv'], accept_multiple_files=True)
 
-data_ref = st.date_input('Data de Referência da Análise', value=datetime(2026, 11, 10))
+data_ref = st.date_input('Data de Referência', value=datetime(2026, 11, 10))
 data_ref = datetime.combine(data_ref, datetime.min.time())
 
 st.divider()
 
-# ==========================================
-# 6. PROCESSAMENTO E EXIBIÇÃO DENTRO DO HTML INTERATIVO
-# ==========================================
-if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
+if st.button('🚀 GERAR ANÁLISE E PAINEL GERENCIAL', type="primary", use_container_width=True):
     if not arquivo_drivers or not arquivos_rotas:
-        st.error('Por favor, faça o upload da base de motoristas (.csv) e do histórico de rotas (.zip ou .csv).')
+        st.error('Por favor, faça o upload das bases.')
     else:
-        with st.spinner('Processando dados e preparando o painel gerencial...'):
+        with st.spinner('Processando inteligência de dados...'):
             try:
                 df_drivers = pd.read_csv(arquivo_drivers, sep=';', dtype=str, encoding='utf-8')
             except Exception:
@@ -244,8 +263,6 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                 col_driver_id = df_drivers.columns[0]
 
             col_phone = next((c for c in df_drivers.columns if any(k in c.lower() for k in ['phone', 'mobile', 'celular', 'whatsapp', 'contato', 'telefone'])), None)
-
-            # Coluna oficial de veículo
             col_veh_name = next((c for c in df_drivers.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
 
             df_ativos = df_drivers[df_drivers[col_status] == 'Active'].copy()
@@ -265,32 +282,26 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
                                 with z.open(filename) as f:
                                     sample = pd.read_csv(f, nrows=5, sep=None, engine='python')
                                     d_col, dt_col = encontrar_colunas(sample.columns.tolist())
-
                                     if not d_col or not dt_col:
                                         continue
-
                                     f.seek(0)
                                     for chunk in pd.read_csv(f, chunksize=200000, usecols=[d_col, dt_col], dtype={d_col: str}, on_bad_lines='skip', sep=None, engine='python'):
                                         chunk['ID_LIMPO'] = chunk[d_col].apply(converter_id_cientifico)
                                         chunk[dt_col] = pd.to_datetime(chunk[dt_col], dayfirst=True, errors='coerce')
                                         chunk = chunk.dropna(subset=['ID_LIMPO', dt_col])
-
                                         max_dates = chunk.groupby('ID_LIMPO')[dt_col].max()
                                         for d_id, dt in max_dates.items():
                                             if d_id not in dict_ultima_rota or dt > dict_ultima_rota[d_id]:
                                                 dict_ultima_rota[d_id] = dt
-
                     os.remove(tmp_path)
 
                 elif up_file.name.endswith('.csv'):
                     df_chunk = pd.read_csv(up_file, dtype=str, on_bad_lines='skip', sep=None, engine='python')
                     d_col, dt_col = encontrar_colunas(df_chunk.columns.tolist())
-
                     if d_col and dt_col:
                         df_chunk['ID_LIMPO'] = df_chunk[d_col].apply(converter_id_cientifico)
                         df_chunk[dt_col] = pd.to_datetime(df_chunk[dt_col], dayfirst=True, errors='coerce')
                         df_chunk = df_chunk.dropna(subset=['ID_LIMPO', dt_col])
-
                         max_dates = df_chunk.groupby('ID_LIMPO')[dt_col].max()
                         for d_id, dt in max_dates.items():
                             if d_id not in dict_ultima_rota or dt > dict_ultima_rota[d_id]:
@@ -317,414 +328,160 @@ if st.button('🚀 GERAR ANÁLISE E DASHBOARD'):
             df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
             df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
 
-            # Extração dos tipos de veículos únicos para o filtro dropdown
-            veiculos_unicos = sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique()))) if col_veh_name in df_analise.columns else []
-            veiculos_options_html = '<option value="TODOS">🚗 Veículo: Todos</option>' + "".join([f'<option value="{v}">{v}</option>' for v in veiculos_unicos if v and v.lower() != 'nan'])
+            st.session_state["df_analise_cache"] = df_analise
+            st.session_state["col_driver_id_name"] = col_driver_id
+            st.session_state["col_veh_name"] = col_veh_name
+            st.toast("Painel gerencial atualizado!", icon="✅")
 
-            total = len(df_analise)
-            c_op = len(df_analise[df_analise['Status_Inatividade'] == 'Ativo'])
-            c_alt = len(df_analise[df_analise['Status_Inatividade'] == 'Alerta'])
-            c_churn = len(df_analise[df_analise['Status_Inatividade'] == 'Churn'])
-            c_sem = len(df_analise[df_analise['Status_Inatividade'] == 'Sem Rotas'])
+# EXIBIÇÃO DO PAINEL GERENCIAL
+if "df_analise_cache" in st.session_state:
+    df_analise = st.session_state["df_analise_cache"]
+    col_driver_id = st.session_state["col_driver_id_name"]
+    col_veh_name = st.session_state["col_veh_name"]
 
-            rows_list = []
-            for _, r in df_analise.iterrows():
-                d_id = str(r[col_driver_id]).replace("'", "").replace('"', '')
-                d_name = str(r.get('Driver Name', 'N/I')).replace("'", "").replace('"', '')
-                d_veh = str(r.get(col_veh_name, 'N/I')).replace("'", "").replace('"', '').strip()
-                d_dias_num = int(r['Dias_Sem_Rota']) if pd.notna(r['Dias_Sem_Rota']) else 9999
-                d_dias_at = r['Dias_Sem_AT_Fmt']
-                d_status = r['Status_Inatividade']
-                d_phone = r.get(col_phone, '') if col_phone else 'Não informado'
-                d_phone_clean = r['Telefone_Limpo']
+    # CARDS GERENCIAIS KPI
+    total = len(df_analise)
+    c_op = len(df_analise[df_analise['Status_Inatividade'] == 'Ativo'])
+    c_alt = len(df_analise[df_analise['Status_Inatividade'] == 'Alerta'])
+    c_churn = len(df_analise[df_analise['Status_Inatividade'] == 'Churn'])
+    c_sem = len(df_analise[df_analise['Status_Inatividade'] == 'Sem Rotas'])
 
-                if d_status == 'Ativo':
-                    badge = '<span style="background: rgba(0, 200, 83, 0.2); color: #00E676; border: 1px solid #00E676; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Ativo (0 a 7d)</span>'
-                elif d_status == 'Alerta':
-                    badge = '<span style="background: rgba(255, 171, 0, 0.2); color: #FFD600; border: 1px solid #FFD600; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Alerta (8 a 20d)</span>'
-                elif d_status == 'Churn':
-                    badge = '<span style="background: rgba(255, 61, 0, 0.2); color: #FF5252; border: 1px solid #FF5252; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Churn (>20d)</span>'
-                else:
-                    badge = '<span style="background: rgba(158, 158, 158, 0.2); color: #B0BEC5; border: 1px solid #B0BEC5; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Sem Histórico</span>'
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#AAA; font-size:0.8rem; font-weight:700;">🔍 TODOS OS DRIVERS</div><div class="metric-num" style="color:#FFF;">{total:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Todos", key="f_todos", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "TODOS"
+            st.rerun()
 
-                if d_phone_clean:
-                    copy_phone_btn = f'''
-                    <button onclick="copiarTexto('{d_phone_clean}', this)" style="background: #2D2D2D; color: #EE4D2D; border: 1px solid #EE4D2D; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; font-weight: 700; transition: all 0.2s;">
-                        📋 Copiar
-                    </button>
-                    '''
-                else:
-                    copy_phone_btn = '<span style="color: #777; font-size: 0.75rem;">Sem Whats</span>'
+    with k2:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#00E676; font-size:0.8rem; font-weight:700;">🟢 OPERACIONAIS</div><div class="metric-num" style="color:#00E676;">{c_op:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Ativos", key="f_op", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Ativo"
+            st.rerun()
 
-                row_html = f'''
-                <tr data-status="{d_status}" data-dias="{d_dias_num}" data-veh="{d_veh}" data-id="{d_id}" data-name="{d_name}" style="border-bottom: 1px solid #2D2D2D;">
-                    <td style="padding: 10px; text-align: center;"><input type="checkbox" class="driver-checkbox" onclick="atualizarContadorSelecao()"></td>
-                    <td style="padding: 10px; color: #EE4D2D; font-weight: 700;">
-                        {d_id}
-                        <button onclick="copiarTexto('{d_id}', this)" title="Copiar ID" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
-                    <td style="padding: 10px;">
-                        {d_name}
-                        <button onclick="copiarTexto('{d_name}', this)" title="Copiar Nome" style="background: transparent; border: none; color: #AAA; cursor: pointer; font-size: 0.8rem; margin-left: 4px;">📋</button>
-                    </td>
-                    <td style="padding: 10px;"><span style="background: #252525; border: 1px solid #3A3A3A; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">{d_veh}</span></td>
-                    <td style="padding: 10px; font-weight: 600; color: #FFF;">{d_dias_at}</td>
-                    <td style="padding: 10px;">{badge}</td>
-                    <td style="padding: 10px; text-align: center;">
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                            <span style="font-size: 0.82rem;">{d_phone}</span>
-                            {copy_phone_btn}
-                        </div>
-                    </td>
-                </tr>
-                '''
-                rows_list.append(row_html)
+    with k3:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FFD600; font-size:0.8rem; font-weight:700;">🟡 EM ALERTA</div><div class="metric-num" style="color:#FFD600;">{c_alt:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Alerta", key="f_alt", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Alerta"
+            st.rerun()
 
-            table_rows = "".join(rows_list)
+    with k4:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FF5252; font-size:0.8rem; font-weight:700;">🔴 INATIVOS (CHURN)</div><div class="metric-num" style="color:#FF5252;">{c_churn:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Churn", key="f_churn", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Churn"
+            st.rerun()
 
-            html_component = f'''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{ background-color: #121212; color: #EEEEEE; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 10px; }}
-                    .kpi-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }}
-                    .kpi-card {{
-                        background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 16px; cursor: pointer;
-                        transition: all 0.25s ease; position: relative; overflow: hidden;
-                    }}
-                    .kpi-card:hover {{ transform: translateY(-3px); border-color: #EE4D2D; box-shadow: 0 6px 15px rgba(238, 77, 45, 0.2); }}
-                    .kpi-card.active {{ border-color: #EE4D2D; background: #261614; box-shadow: 0 0 15px rgba(238, 77, 45, 0.4); }}
-                    .kpi-title {{ font-size: 0.75rem; text-transform: uppercase; color: #888888; font-weight: 700; letter-spacing: 0.5px; }}
-                    .kpi-num {{ font-size: 1.8rem; font-weight: 800; color: #FFF; margin-top: 5px; }}
-                    
-                    .table-container {{ background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; }}
-                    
-                    .header-bar {{
-                        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
-                    }}
-                    .section-title {{
-                        color: #EE4D2D; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;
-                    }}
+    with k5:
+        st.markdown(f'<div class="metric-card-gerencial"><div style="color:#B0BEC5; font-size:0.8rem; font-weight:700;">⚪ SEM HISTÓRICO</div><div class="metric-num" style="color:#B0BEC5;">{c_sem:,}</div></div>', unsafe_allow_html=True)
+        if st.button("Filtrar Sem Rotas", key="f_sem", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "Sem Rotas"
+            st.rerun()
 
-                    .filter-toolbar {{
-                        display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-                        background: #161616; padding: 12px 14px; border-radius: 10px; border: 1px solid #2A2A2A; margin-bottom: 15px;
-                    }}
+    st.markdown("<br>", unsafe_allow_html=True)
 
-                    .toolbar-group {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
+    # FILTROS DE BUSCA E TIPO DE VEÍCULO
+    f_col1, f_col2, f_col3 = st.columns([2, 1.5, 1])
+    with f_col1:
+        busca_texto = st.text_input("🔍 Busca Rápida (Nome ou ID)", "")
+    with f_col2:
+        veiculos_unicos = ["TODOS"] + sorted(list(set(df_analise[col_veh_name].dropna().astype(str).str.strip().unique())))
+        veh_selecionado = st.selectbox("🚗 Tipo de Veículo", veiculos_unicos)
+    with f_col3:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Resetar Filtros", use_container_width=True):
+            st.session_state["filtro_kpi_status"] = "TODOS"
+            st.rerun()
 
-                    .action-btn {{
-                        background: #252525; color: #FFF; border: 1px solid #444; border-radius: 8px; padding: 7px 14px;
-                        font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
-                    }}
-                    .action-btn:hover {{ background: #333; border-color: #EE4D2D; color: #EE4D2D; }}
+    df_exibir = df_analise.copy()
+    if st.session_state["filtro_kpi_status"] != "TODOS":
+        df_exibir = df_exibir[df_exibir["Status_Inatividade"] == st.session_state["filtro_kpi_status"]]
 
-                    .action-btn.primary {{
-                        background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%); border: none; color: white;
-                    }}
-                    .action-btn.primary:hover {{ opacity: 0.9; transform: translateY(-1px); }}
+    if veh_selecionado != "TODOS":
+        df_exibir = df_exibir[df_exibir[col_veh_name] == veh_selecionado]
 
-                    .search-input, .select-input {{
-                        background: #121212; border: 1px solid #333; color: #FFF; padding: 8px 12px; border-radius: 8px;
-                        font-size: 0.85rem; outline: none;
-                    }}
-                    .search-input:focus, .select-input:focus {{ border-color: #EE4D2D; }}
+    if busca_texto:
+        termo = busca_texto.lower()
+        df_exibir = df_exibir[
+            df_exibir[col_driver_id].astype(str).str.lower().str.contains(termo) |
+            df_exibir["Driver Name"].astype(str).str.lower().str.contains(termo)
+        ]
 
-                    table {{ width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }}
-                    th {{ background: #181818; color: #EE4D2D; font-weight: 700; text-transform: uppercase; padding: 12px 10px; border-bottom: 2px solid #EE4D2D; font-size: 0.78rem; }}
-                    tr:hover {{ background-color: #242424; }}
-                    
-                    .badge-selected {{
-                        background: rgba(238, 77, 45, 0.2); color: #EE4D2D; font-size: 0.78rem; font-weight: 700;
-                        padding: 3px 8px; border-radius: 6px; border: 1px solid #EE4D2D;
-                    }}
-                </style>
-            </head>
-            <body>
+    st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
 
-            <!-- KPIS CLICÁVEIS -->
-            <div class="kpi-grid">
-                <div class="kpi-card active" onclick="filtrarStatus('TODOS', this)">
-                    <div class="kpi-title">🔍 Todos os Drivers</div>
-                    <div class="kpi-num">{total:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Ativo', this)">
-                    <div class="kpi-title" style="color: #00E676;">🟢 Operacionais (0 a 7d)</div>
-                    <div class="kpi-num" style="color: #00E676;">{c_op:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Alerta', this)">
-                    <div class="kpi-title" style="color: #FFD600;">🟡 Em Alerta (8 a 20d)</div>
-                    <div class="kpi-num" style="color: #FFD600;">{c_alt:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Churn', this)">
-                    <div class="kpi-title" style="color: #FF5252;">🔴 Inativos (>20d)</div>
-                    <div class="kpi-num" style="color: #FF5252;">{c_churn:,}</div>
-                </div>
-                <div class="kpi-card" onclick="filtrarStatus('Sem Rotas', this)">
-                    <div class="kpi-title" style="color: #B0BEC5;">⚪ Sem Histórico AT</div>
-                    <div class="kpi-num" style="color: #B0BEC5;">{c_sem:,}</div>
-                </div>
-            </div>
+    # PREPARAÇÃO DA TABELA NATIVA COM SELEÇÃO ESTÁVEL
+    df_tabela = pd.DataFrame()
+    df_tabela["Acionar"] = False
+    df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
+    df_tabela["Nome do Motorista"] = df_exibir["Driver Name"].astype(str)
+    df_tabela["Veículo"] = df_exibir[col_veh_name].astype(str)
+    df_tabela["Inatividade"] = df_exibir["Dias_Sem_AT_Fmt"]
+    df_tabela["Status"] = df_exibir["Status_Inatividade"]
+    df_tabela["Telefone"] = df_exibir["Telefone_Limpo"]
 
-            <!-- CONTAINER DA TABELA -->
-            <div class="table-container">
-                
-                <!-- CABEÇALHO DO BLOCO COM TÍTULO E CAMPO DE BUSCA DE TEXTO -->
-                <div class="header-bar">
-                    <div class="section-title">📋 Detalhamento da Base de Motoristas</div>
-                    <input type="text" id="searchInput" class="search-input" onkeyup="aplicarFiltros()" placeholder="Buscar por ID, Nome ou Veículo..." style="width: 280px;">
-                </div>
+    df_editado_tabela = st.data_editor(
+        df_tabela,
+        column_config={
+            "Acionar": st.column_config.CheckboxColumn("Acionar em Massa", default=False),
+            "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
+            "Nome do Motorista": st.column_config.TextColumn("Nome do Motorista", disabled=True),
+            "Veículo": st.column_config.TextColumn("Veículo", disabled=True),
+            "Inatividade": st.column_config.TextColumn("Dias Sem AT", disabled=True),
+            "Status": st.column_config.TextColumn("Status", disabled=True),
+            "Telefone": st.column_config.TextColumn("Contato Tel", disabled=True)
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="tabela_gerencial_drivers"
+    )
 
-                <!-- BARRA DE FILTROS E AÇÕES DE CÓPIA -->
-                <div class="filter-toolbar">
-                    <div class="toolbar-group">
-                        <button onclick="aplicarFiltros()" class="action-btn primary">
-                            🔎 Pesquisar
-                        </button>
+    drivers_marcados = df_editado_tabela[df_editado_tabela["Acionar"] == True]
 
-                        <select id="diasFilter" class="select-input" onchange="aplicarFiltros()">
-                            <option value="TODOS">⏱️ Dias sem AT: Todos</option>
-                            <option value="0-7">🟢 0 a 7 dias sem AT</option>
-                            <option value="8-15">🟡 8 a 15 dias sem AT</option>
-                            <option value="16-20">🟧 16 a 20 dias sem AT</option>
-                            <option value="21+">🔴 Mais de 20 dias (Churn)</option>
-                            <option value="SEM">⚪ Sem Histórico de Rotas</option>
-                        </select>
+    st.markdown("---")
+    st.markdown("### 📍 Configuração do Treinamento Presencial & Transferência de Fila")
+    
+    col_e1, col_e2, col_e3 = st.columns([2, 1, 1])
+    with col_e1:
+        endereco_hub_input = st.text_input("📍 Endereço do HUB / Local do Treinamento", "Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP")
+    with col_e2:
+        dt_ag = st.date_input("Data do Treinamento", value=datetime.now())
+    with col_e3:
+        hr_ag = st.time_input("Horário do Treinamento", value=datetime.now().time())
 
-                        <select id="veiculoFilter" class="select-input" onchange="aplicarFiltros()">
-                            {veiculos_options_html}
-                        </select>
+    if st.button(f"📅 DIRECCIONAR {len(drivers_marcados)} MOTORISTA(S) SELECIONADO(S) PARA O AGENDAMENTO", type="primary", use_container_width=True):
+        if drivers_marcados.empty:
+            st.warning("Selecione pelo menos 1 motorista na caixa 'Acionar em Massa' da tabela acima!")
+        else:
+            novos_registros = []
+            agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-                        <button onclick="limparFiltros()" class="action-btn" title="Restaurar visualização original">
-                            🔄 Limpar Filtros
-                        </button>
-                    </div>
+            for _, r in drivers_marcados.iterrows():
+                novos_registros.append({
+                    "Driver ID": str(r["Driver ID"]),
+                    "Nome": str(r["Nome do Motorista"]),
+                    "Telefone": str(r["Telefone"]),
+                    "Veiculo": str(r["Veículo"]),
+                    "Data Acionamento": agora_str,
+                    "Data Reunião": dt_ag.strftime("%d/%m/%Y"),
+                    "Horário": hr_ag.strftime("%H:%M"),
+                    "Status": "Aguardando Reunião",
+                    "Endereço HUB / Pauta": endereco_hub_input
+                })
 
-                    <div class="toolbar-group">
-                        <button onclick="copiarVisiveis('id')" class="action-btn primary" title="Copiar apenas os IDs visíveis">
-                            📋 Copiar IDs (Visíveis)
-                        </button>
-                        <button onclick="copiarVisiveis('name')" class="action-btn" title="Copiar apenas os Nomes visíveis">
-                            📋 Copiar Nomes (Visíveis)
-                        </button>
-                        <button onclick="copiarSelecionados()" class="action-btn" title="Copiar itens marcados pelas caixas de seleção">
-                            ✅ Copiar Selecionados <span id="lblSelecionados" class="badge-selected">0</span>
-                        </button>
-                    </div>
-                </div>
+            if novos_registros and salvar_historico and carregar_historico:
+                df_h = carregar_historico()
+                df_f = pd.concat([pd.DataFrame(novos_registros), df_h], ignore_index=True).drop_duplicates(subset=["Driver ID", "Data Reunião"], keep="first")
+                salvar_historico(df_f)
 
-                <div style="overflow-x: auto; max-height: 520px; overflow-y: auto;">
-                    <table id="driversTable">
-                        <thead>
-                            <tr>
-                                <th style="text-align: center; width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
-                                <th>DRIVER ID</th>
-                                <th>NOME DO MOTORISTA</th>
-                                <th>VEÍCULO</th>
-                                <th>DIAS SEM HISTÓRICO DE AT</th>
-                                <th>STATUS INATIVIDADE</th>
-                                <th style="text-align: center;">CONTATO / WHATSAPP</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {table_rows}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                st.session_state["drivers_para_agendar"] = novos_registros
+                st.session_state["pagina_atual"] = "📅 Reengajamento & Reuniões"
+                st.toast("✅ Fila enviada para o módulo de agendamentos!", icon="🚀")
+                st.rerun()
 
-            <script>
-                let currentCardStatus = 'TODOS';
-
-                function filtrarStatus(status, cardElement) {{
-                    currentCardStatus = status;
-                    let cards = document.querySelectorAll('.kpi-card');
-                    cards.forEach(c => c.classList.remove('active'));
-                    cardElement.classList.add('active');
-                    aplicarFiltros();
-                }}
-
-                function aplicarFiltros() {{
-                    let searchText = document.getElementById('searchInput').value.toLowerCase().trim();
-                    let diasVal = document.getElementById('diasFilter').value;
-                    let vehVal = document.getElementById('veiculoFilter').value.toUpperCase().trim();
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-
-                    rows.forEach(row => {{
-                        let rowStatus = row.getAttribute('data-status');
-                        let rowDias = parseInt(row.getAttribute('data-dias'));
-                        let rowVeh = (row.getAttribute('data-veh') || '').toUpperCase().trim();
-                        let rowText = row.textContent.toLowerCase();
-
-                        // 1. Filtro Card KPI / Status
-                        let matchCard = (currentCardStatus === 'TODOS') || (rowStatus === currentCardStatus);
-                        
-                        // 2. Filtro Busca Texto Geral
-                        let matchText = (searchText === '') || rowText.includes(searchText);
-
-                        // 3. Filtro Dias Sem AT
-                        let matchDias = true;
-                        if (diasVal === '0-7') matchDias = (rowDias >= 0 && rowDias <= 7);
-                        else if (diasVal === '8-15') matchDias = (rowDias >= 8 && rowDias <= 15);
-                        else if (diasVal === '16-20') matchDias = (rowDias >= 16 && rowDias <= 20);
-                        else if (diasVal === '21+') matchDias = (rowDias > 20 && rowDias < 9999);
-                        else if (diasVal === 'SEM') matchDias = (rowDias === 9999);
-
-                        // 4. Filtro Tipo de Veículo (CASE-INSENSITIVE + TRIM)
-                        let matchVeh = (vehVal === 'TODOS') || (rowVeh === vehVal);
-
-                        if (matchCard && matchText && matchDias && matchVeh) {{
-                            row.style.display = '';
-                        }} else {{
-                            row.style.display = 'none';
-                        }}
-                    }});
-                }}
-
-                function limparFiltros() {{
-                    document.getElementById('searchInput').value = '';
-                    document.getElementById('diasFilter').value = 'TODOS';
-                    document.getElementById('veiculoFilter').value = 'TODOS';
-                    currentCardStatus = 'TODOS';
-                    
-                    let cards = document.querySelectorAll('.kpi-card');
-                    cards.forEach(c => c.classList.remove('active'));
-                    if(cards.length > 0) cards[0].classList.add('active');
-
-                    let checkboxes = document.querySelectorAll('.driver-checkbox');
-                    checkboxes.forEach(cb => cb.checked = false);
-                    document.getElementById('selectAll').checked = false;
-                    atualizarContadorSelecao();
-
-                    aplicarFiltros();
-                }}
-
-                function toggleSelectAll(masterCb) {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    rows.forEach(row => {{
-                        if (row.style.display !== 'none') {{
-                            let cb = row.querySelector('.driver-checkbox');
-                            if(cb) cb.checked = masterCb.checked;
-                        }}
-                    }});
-                    atualizarContadorSelecao();
-                }}
-
-                function atualizarContadorSelecao() {{
-                    let checked = document.querySelectorAll('.driver-checkbox:checked').length;
-                    document.getElementById('lblSelecionados').textContent = checked;
-                }}
-
-                function copiarParaClipboard(texto) {{
-                    if (navigator.clipboard && window.isSecureContext) {{
-                        return navigator.clipboard.writeText(texto).catch(err => {{
-                            return fallbackCopiar(texto);
-                        }});
-                    }} else {{
-                        return fallbackCopiar(texto);
-                    }}
-                }}
-
-                function fallbackCopiar(texto) {{
-                    return new Promise((resolve, reject) => {{
-                        let textArea = document.createElement("textarea");
-                        textArea.value = texto;
-                        textArea.style.position = "fixed";
-                        textArea.style.left = "-999999px";
-                        textArea.style.top = "-999999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        try {{
-                            let successful = document.execCommand('copy');
-                            document.body.removeChild(textArea);
-                            if (successful) resolve(); else reject(new Error('Copy failed'));
-                        }} catch (err) {{
-                            document.body.removeChild(textArea);
-                            reject(err);
-                        }}
-                    }});
-                }}
-
-                function copiarTexto(texto, btnElement) {{
-                    copiarParaClipboard(texto).then(() => {{
-                        let originalText = btnElement.innerHTML;
-                        btnElement.innerHTML = '✅ Copiado!';
-                        btnElement.style.background = '#00C853';
-                        btnElement.style.color = '#FFF';
-
-                        setTimeout(() => {{
-                            btnElement.innerHTML = originalText;
-                            btnElement.style.background = '';
-                            btnElement.style.color = '';
-                        }}, 1500);
-                    }}).catch(err => alert('Copie manualmente: ' + texto));
-                }}
-
-                function copiarVisiveis(tipo) {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    let lista = [];
-
-                    rows.forEach(row => {{
-                        if (row.style.display !== 'none') {{
-                            let val = row.getAttribute('data-' + tipo);
-                            if (val && val !== 'null' && val !== 'undefined') lista.push(val);
-                        }}
-                    }});
-
-                    if (lista.length === 0) {{
-                        alert('Nenhum motorista visível para copiar!');
-                        return;
-                    }}
-
-                    let textoFinal = lista.join('\\n');
-                    copiarParaClipboard(textoFinal).then(() => {{
-                        alert('✅ ' + lista.length + ' ' + (tipo === 'id' ? 'IDs' : 'Nomes') + ' copiados para a área de transferência!');
-                    }}).catch(err => alert('Erro ao copiar lista!'));
-                }}
-
-                function copiarSelecionados() {{
-                    let rows = document.querySelectorAll('#driversTable tbody tr');
-                    let lista = [];
-
-                    rows.forEach(row => {{
-                        let cb = row.querySelector('.driver-checkbox');
-                        if (cb && cb.checked) {{
-                            let id = row.getAttribute('data-id');
-                            let name = row.getAttribute('data-name');
-                            lista.push(id + ' - ' + name);
-                        }}
-                    }});
-
-                    if (lista.length === 0) {{
-                        alert('Selecione pelo menos um motorista usando as caixas de seleção!');
-                        return;
-                    }}
-
-                    let textoFinal = lista.join('\\n');
-                    copiarParaClipboard(textoFinal).then(() => {{
-                        alert('✅ ' + lista.length + ' motoristas selecionados copiados para a área de transferência!');
-                    }}).catch(err => alert('Erro ao copiar selecionados!'));
-                }}
-            </script>
-            </body>
-            </html>
-            '''
-
-            components.html(html_component, height=730, scrolling=True)
-
-            csv_data = df_analise.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            st.download_button(
-                label='📥 BAIXAR RELATÓRIO COMPLETO (CSV)',
-                data=csv_data,
-                file_name='relatorio_churn_galpao.csv',
-                mime='text/csv'
-            )
-
-# ==========================================
-# 7. RODAPÉ MARCA D'ÁGUA LIMPA
-# ==========================================
-img_footer_html = f'<img src="{img_shopito_entregador}" class="watermark-img">' if img_shopito_entregador else ''
-footer_html = f'''<div class="watermark-footer">{img_footer_html}<div class="watermark-text">Created by <strong>Pedro Heleno</strong><br>Fleet - LSP93</div></div>'''
+img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
+footer_html = f'''
+<div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display:flex; align-items:center; gap: 12px;">{img_footer_html} <span style="color:#FFF; font-weight:700;">SPX Logistics</span></div>
+    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
+</div>
+'''
 st.markdown(footer_html, unsafe_allow_html=True)
