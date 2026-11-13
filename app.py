@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import urllib.parse
 import zipfile
 import pandas as pd
 import streamlit as st
@@ -12,12 +13,15 @@ try:
     from modulo_reengajamento import (
         renderizar_modulo_reengajamento,
         carregar_historico,
-        registrar_acionamentos_lote
+        registrar_novo_acionamento
     )
-except ImportError:
+    MODULO_REENG_OK = True
+except Exception as e:
+    MODULO_REENG_OK = False
+    ERRO_IMPORT_REENG = str(e)
     renderizar_modulo_reengajamento = None
     carregar_historico = None
-    registrar_acionamentos_lote = None
+    registrar_novo_acionamento = None
 
 try:
     from modulo_assistente_ia import renderizar_modulo_ia
@@ -45,7 +49,10 @@ if "selecionar_todos_flag" not in st.session_state:
 if "base_travada" not in st.session_state:
     st.session_state["base_travada"] = False
 
-# Estilização Neon Fluorescente do Menu Lateral
+if "analista_logado" not in st.session_state:
+    st.session_state["analista_logado"] = ""
+
+# Estilização Neon Fluorescente
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
@@ -73,35 +80,33 @@ st.markdown("""
         border: 1px solid var(--shopee-orange);
         border-radius: 12px;
         padding: 14px;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
         box-shadow: 0 0 12px rgba(238, 77, 45, 0.35);
         text-align: center;
     }
 
     .sidebar-logo {
-        max-height: 80px;
+        max-height: 75px;
         width: auto;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         filter: drop-shadow(0 0 8px rgba(238, 77, 45, 0.5));
     }
 
     .sidebar-title {
         color: #FFFFFF;
         font-weight: 800;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
+        font-size: 1.05rem;
     }
 
     .sidebar-badge {
         background: linear-gradient(90deg, #EE4D2D 0%, #FF5722 100%);
         color: white;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 800;
         padding: 3px 8px;
         border-radius: 6px;
         display: inline-block;
         margin-top: 4px;
-        box-shadow: 0 0 8px #EE4D2D;
     }
 
     .metric-card-gerencial {
@@ -117,11 +122,6 @@ st.markdown("""
         font-size: 1.8rem;
         font-weight: 800;
         margin-top: 4px;
-    }
-
-    .stRadio > label {
-        color: #FFF !important;
-        font-weight: 700 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -144,16 +144,32 @@ def get_base64_image_cached(image_filename):
 img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg') or get_base64_image_cached('Formula 1_2.jpg')
 img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
 
-# MENU LATERAL LED NEON
+# ==========================================
+# MENU LATERAL + IDENTIFICAÇÃO DO ANALISTA
+# ==========================================
 sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else '🏎️'
 
 st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
-    <div style="text-align: center; margin-bottom: 8px;">{sidebar_img_html}</div>
+    <div style="text-align: center; margin-bottom: 6px;">{sidebar_img_html}</div>
     <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
     <div class="sidebar-badge">🧪 AMBIENTE DEV / STAGING</div>
 </div>
 """, unsafe_allow_html=True)
+
+# Campo obrigatório/destacado para identificar o Analista Responsável
+st.sidebar.markdown("### 👤 Analista Responsável")
+analista_input = st.sidebar.text_input(
+    "Seu Nome (será gravado nos acionamentos):",
+    value=st.session_state["analista_logado"],
+    placeholder="Ex: Pedro Heleno"
+)
+st.session_state["analista_logado"] = analista_input.strip()
+
+if not st.session_state["analista_logado"]:
+    st.sidebar.warning("⚠️ Preencha seu nome acima antes de acionar motoristas.")
+
+st.sidebar.divider()
 
 opcoes_menu = [
     "📊 Control Tower Churn",
@@ -169,10 +185,8 @@ opcao_menu = st.sidebar.radio(
     opcoes_menu,
     index=opcoes_menu.index(st.session_state["pagina_atual"])
 )
-
 st.session_state["pagina_atual"] = opcao_menu
 
-# Indicador de Base Travada na Sidebar + Comando Manual de Reset
 st.sidebar.divider()
 if st.session_state.get("base_travada") and "df_analise_cache" in st.session_state:
     st.sidebar.success(f"🔒 Base Carregada ({len(st.session_state['df_analise_cache'])} drivers)")
@@ -180,20 +194,17 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
         for chave in ["df_analise_cache", "base_travada", "col_driver_id_name", "col_driver_name_col", "col_veh_name"]:
             st.session_state.pop(chave, None)
         st.session_state["selecionar_todos_flag"] = False
-        st.toast("Bases removidas. Você já pode importar novos arquivos.", icon="🗑️")
         st.rerun()
-else:
-    st.sidebar.info("📂 Aguardando importação das bases")
 
 st.sidebar.divider()
 st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
 
 # ROTEAMENTO DAS PÁGINAS SECUNDÁRIAS
 if st.session_state["pagina_atual"] == "📅 Reengajamento & Reuniões":
-    if renderizar_modulo_reengajamento:
+    if MODULO_REENG_OK and renderizar_modulo_reengajamento:
         renderizar_modulo_reengajamento()
     else:
-        st.error("Módulo 'modulo_reengajamento.py' não encontrado.")
+        st.error(f"Erro ao carregar 'modulo_reengajamento.py': {ERRO_IMPORT_REENG}")
     st.stop()
 
 if st.session_state["pagina_atual"] == "🤖 Assistente IA (SPX Copilot)":
@@ -202,6 +213,87 @@ if st.session_state["pagina_atual"] == "🤖 Assistente IA (SPX Copilot)":
     else:
         st.error("Módulo 'modulo_assistente_ia.py' não encontrado.")
     st.stop()
+
+
+# ==========================================
+# JANELA MODAL (POP-UP) DE ACIONAMENTO WHATSAPP
+# ==========================================
+@st.dialog("📲 Registrar Acionamento & Chamar no WhatsApp")
+def modal_acionar_driver(driver_info: dict):
+    st.markdown(f"**Motorista:** `{driver_info['Driver ID']}` — **{driver_info['Nome']}**")
+    st.markdown(f"**Veículo:** {driver_info['Veiculo']} | **Inatividade:** {driver_info['Inatividade']}")
+    st.divider()
+
+    analista_atual = st.text_input(
+        "👤 Analista Responsável pelo Acionamento:",
+        value=st.session_state.get("analista_logado", ""),
+        placeholder="Digite seu nome"
+    )
+
+    tipo_acionamento = st.selectbox(
+        "📌 Tipo de Acionamento:",
+        [
+            "Convocação Treinamento Presencial",
+            "Contato Preventivo (Motorista em Alerta)",
+            "Resgate de Inativo (Churn > 20 dias)",
+            "Alinhamento de Rotas / Disponibilidade",
+            "Atualização Cadastral / Documentação"
+        ]
+    )
+
+    endereco_hub = st.text_input(
+        "📍 Endereço do HUB (se aplicável):",
+        value="Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP"
+    )
+
+    c_d1, c_d2 = st.columns(2)
+    with c_d1:
+        dt_reuniao = st.date_input("Data Sugerida / Treinamento", value=datetime.now())
+    with c_d2:
+        hr_reuniao = st.time_input("Horário", value=datetime.now().time())
+
+    obs_inicial = st.text_input(
+        "📝 Observação Inicial (Opcional):",
+        placeholder="Ex: Tentativa de contato via WhatsApp..."
+    )
+
+    phone = str(driver_info["Telefone"]).strip()
+    msg_whatsapp = (
+        f"Olá {driver_info['Nome']}! Aqui é {analista_atual or 'da equipe'} da SPX Logistics (LSP93). "
+        f"Estamos entrando em contato referente a: *{tipo_acionamento}*.\n"
+        f"📅 Data: {dt_reuniao.strftime('%d/%m/%Y')} às {hr_reuniao.strftime('%H:%M')}\n"
+        f"📍 Local: {endereco_hub}\n"
+        f"Podemos confirmar sua participação?"
+    )
+    url_wa = f"https://api.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg_whatsapp)}" if phone else ""
+
+    if st.button("✅ GRAVAR NO HISTÓRICO E LIBERAR WHATSAPP", type="primary", use_container_width=True):
+        if not analista_atual.strip():
+            st.error("⚠️ Por favor, informe o nome do Analista Responsável antes de registrar!")
+        else:
+            st.session_state["analista_logado"] = analista_atual.strip()
+            if registrar_novo_acionamento:
+                registrar_novo_acionamento(
+                    driver_id=driver_info["Driver ID"],
+                    nome=driver_info["Nome"],
+                    telefone=phone,
+                    veiculo=driver_info["Veiculo"],
+                    analista=analista_atual.strip(),
+                    tipo_acionamento=tipo_acionamento,
+                    status="Driver Acionado",
+                    observacao=obs_inicial,
+                    data_reuniao=dt_reuniao.strftime("%d/%m/%Y"),
+                    horario=hr_reuniao.strftime("%H:%M"),
+                    endereco_hub=endereco_hub
+                )
+            st.session_state["ultimo_link_wa_liberado"] = url_wa
+            st.session_state["ultimo_driver_liberado"] = driver_info["Nome"]
+            st.success(f"Acionamento registrado com sucesso às {datetime.now().strftime('%H:%M:%S')}!")
+            if url_wa:
+                st.link_button("🚀 ABRIR CONVERSA NO WHATSAPP AGORA", url_wa, type="primary", use_container_width=True)
+            else:
+                st.warning("Este motorista não possui número de telefone válido cadastrado.")
+
 
 # ==========================================
 # FUNÇÕES DE APOIO E IMPORTAÇÃO
@@ -368,17 +460,6 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
     col_driver_name = st.session_state.get("col_driver_name_col", "Driver Name")
     col_veh_name = st.session_state["col_veh_name"]
 
-    # Barra de status da base travada com comando explícito de limpeza
-    col_info_base, col_reset_base = st.columns([4, 1.3])
-    with col_info_base:
-        st.info("🔒 **Base ativa na sessão.** Os dados permanecerão carregados mesmo ao navegar entre abas ou registrar acionamentos.")
-    with col_reset_base:
-        if st.button("🗑️ Limpar / Trocar Bases", key="btn_reset_topo", use_container_width=True):
-            for chave in ["df_analise_cache", "base_travada", "col_driver_id_name", "col_driver_name_col", "col_veh_name"]:
-                st.session_state.pop(chave, None)
-            st.session_state["selecionar_todos_flag"] = False
-            st.rerun()
-
     # CARDS GERENCIAIS KPI
     total = len(df_analise)
     c_op = len(df_analise[df_analise['Status_Inatividade'] == 'Ativo'])
@@ -391,35 +472,30 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
         st.markdown(f'<div class="metric-card-gerencial"><div style="color:#AAA; font-size:0.8rem; font-weight:700;">🔍 TODOS OS DRIVERS</div><div class="metric-num" style="color:#FFF;">{total:,}</div></div>', unsafe_allow_html=True)
         if st.button("Filtrar Todos", key="f_todos", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "TODOS"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     with k2:
         st.markdown(f'<div class="metric-card-gerencial"><div style="color:#00E676; font-size:0.8rem; font-weight:700;">🟢 OPERACIONAIS</div><div class="metric-num" style="color:#00E676;">{c_op:,}</div></div>', unsafe_allow_html=True)
         if st.button("Filtrar Ativos", key="f_op", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "Ativo"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     with k3:
         st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FFD600; font-size:0.8rem; font-weight:700;">🟡 EM ALERTA</div><div class="metric-num" style="color:#FFD600;">{c_alt:,}</div></div>', unsafe_allow_html=True)
         if st.button("Filtrar Alerta", key="f_alt", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "Alerta"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     with k4:
         st.markdown(f'<div class="metric-card-gerencial"><div style="color:#FF5252; font-size:0.8rem; font-weight:700;">🔴 INATIVOS (CHURN)</div><div class="metric-num" style="color:#FF5252;">{c_churn:,}</div></div>', unsafe_allow_html=True)
         if st.button("Filtrar Churn", key="f_churn", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "Churn"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     with k5:
         st.markdown(f'<div class="metric-card-gerencial"><div style="color:#B0BEC5; font-size:0.8rem; font-weight:700;">⚪ SEM HISTÓRICO</div><div class="metric-num" style="color:#B0BEC5;">{c_sem:,}</div></div>', unsafe_allow_html=True)
         if st.button("Filtrar Sem Rotas", key="f_sem", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "Sem Rotas"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -435,7 +511,6 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 Resetar Filtros", use_container_width=True):
             st.session_state["filtro_kpi_status"] = "TODOS"
-            st.session_state["selecionar_todos_flag"] = False
             st.rerun()
 
     df_exibir = df_analise.copy()
@@ -452,7 +527,7 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
             df_exibir[col_driver_name].astype(str).str.lower().str.contains(termo)
         ]
 
-    # Consulta histórico salvo para mostrar na tabela se o driver já tem situação registrada
+    # Consulta histórico salvo para exibir situação atual na tabela
     mapa_status_historico = {}
     if carregar_historico:
         df_hist_atual = carregar_historico()
@@ -460,116 +535,62 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
             for _, rh in df_hist_atual.iterrows():
                 d_id_h = str(rh["Driver ID"]).strip()
                 if d_id_h not in mapa_status_historico:
-                    obs_txt = f" ({rh['Observação / Tratativa']})" if rh.get("Observação / Tratativa") else ""
-                    mapa_status_historico[d_id_h] = f"{rh['Status']}{obs_txt}"
+                    mapa_status_historico[d_id_h] = f"{rh['Status']} ({rh['Analista Responsável']} - {rh['Data/Hora Acionamento']})"
 
-    col_title, col_sel_all = st.columns([3, 1.2])
-    with col_title:
-        st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
-    with col_sel_all:
-        if st.button("☑️ Marcar / Desmarcar Todos", use_container_width=True):
-            st.session_state["selecionar_todos_flag"] = not st.session_state["selecionar_todos_flag"]
-            st.rerun()
+    # ==========================================
+    # SELETOR RÁPIDO PARA ABRIR POP-UP DE ACIONAMENTO
+    # ==========================================
+    st.markdown("### 📲 Acionar Motorista no WhatsApp (Abre Janela de Registro)")
+    st.caption("Escolha o motorista abaixo e clique no botão laranja. Uma janela abrirá para registrar o **Tipo de Acionamento** e o **Analista** antes de abrir o WhatsApp:")
+
+    opcoes_drivers_popup = [
+        f"{r[col_driver_id]} - {r[col_driver_name]} ({r.get(col_veh_name, 'N/I')}) | {r['Dias_Sem_AT_Fmt']}"
+        for _, r in df_exibir.head(300).iterrows()
+    ]
+
+    col_pop1, col_pop2 = st.columns([3, 1.3])
+    with col_pop1:
+        driver_escolhido_str = st.selectbox(
+            "Selecione o motorista para chamar:",
+            options=opcoes_drivers_popup,
+            label_visibility="collapsed"
+        )
+    with col_pop2:
+        if st.button("📲 CHAMAR NO WHATS (REGISTRAR)", type="primary", use_container_width=True):
+            if driver_escolhido_str:
+                id_sel = driver_escolhido_str.split(" - ")[0].strip()
+                row_sel = df_exibir[df_exibir[col_driver_id].astype(str).str.strip() == id_sel].iloc[0]
+                modal_acionar_driver({
+                    "Driver ID": str(row_sel[col_driver_id]),
+                    "Nome": str(row_sel[col_driver_name]),
+                    "Veiculo": str(row_sel.get(col_veh_name, "N/I")),
+                    "Inatividade": str(row_sel["Dias_Sem_AT_Fmt"]),
+                    "Telefone": str(row_sel["Telefone_Limpo"])
+                })
+
+    st.divider()
+
+    # ==========================================
+    # TABELA GERENCIAL DE CONSULTA
+    # ==========================================
+    st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
 
     df_tabela = pd.DataFrame()
-    df_tabela["Selecionar"] = st.session_state["selecionar_todos_flag"]
     df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
     df_tabela["Nome do Motorista"] = df_exibir[col_driver_name].astype(str)
     df_tabela["Veículo"] = df_exibir[col_veh_name].astype(str) if col_veh_name in df_exibir.columns else "N/I"
     df_tabela["Inatividade"] = df_exibir["Dias_Sem_AT_Fmt"]
-    df_tabela["Situação Registrada"] = df_tabela["Driver ID"].apply(lambda x: mapa_status_historico.get(str(x).strip(), "Não Acionado"))
+    df_tabela["Status Frota"] = df_exibir["Status_Inatividade"]
+    df_tabela["Histórico / Último Acionamento"] = df_tabela["Driver ID"].apply(
+        lambda x: mapa_status_historico.get(str(x).strip(), "Não Acionado")
+    )
     df_tabela["Telefone"] = df_exibir["Telefone_Limpo"]
-    df_tabela["WhatsApp"] = df_exibir["Telefone_Limpo"].apply(
-        lambda p: f"https://api.whatsapp.com/send?phone={p}" if p else ""
-    )
 
-    editor_key = f"tabela_gerencial_{st.session_state['selecionar_todos_flag']}_{st.session_state['filtro_kpi_status']}_{veh_selecionado}"
-
-    df_editado_tabela = st.data_editor(
+    st.dataframe(
         df_tabela,
-        column_config={
-            "Selecionar": st.column_config.CheckboxColumn("Selecionar", default=False),
-            "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
-            "Nome do Motorista": st.column_config.TextColumn("Nome do Motorista", disabled=True),
-            "Veículo": st.column_config.TextColumn("Veículo", disabled=True),
-            "Inatividade": st.column_config.TextColumn("Dias Sem AT", disabled=True),
-            "Situação Registrada": st.column_config.TextColumn("Último Registro / Situação", disabled=True),
-            "Telefone": st.column_config.TextColumn("Contato Tel", disabled=True),
-            "WhatsApp": st.column_config.LinkColumn("📲 Abrir Whats", display_text="Chamar no Whats")
-        },
         hide_index=True,
-        use_container_width=True,
-        key=editor_key
+        use_container_width=True
     )
-
-    drivers_marcados = df_editado_tabela[df_editado_tabela["Selecionar"] == True]
-
-    # ==========================================
-    # PAINEL DE REGISTRO DE SITUAÇÃO DO ACIONAMENTO
-    # ==========================================
-    st.markdown("---")
-    st.markdown(f"### 📝 Registrar Situação do Acionamento ({len(drivers_marcados)} selecionado(s))")
-    st.caption("Selecione 1 ou mais motoristas na tabela acima, defina em que situação está o acionamento e grave no histórico:")
-
-    c_reg1, c_reg2, c_reg3 = st.columns([1.5, 2.5, 1.5])
-    with c_reg1:
-        situacao_acionamento = st.selectbox(
-            "Situação Atual do Acionamento:",
-            [
-                "Driver Acionado",
-                "Aguardando Reunião",
-                "Sem Resposta",
-                "Confirmado",
-                "Reintegrado",
-                "Faltou",
-                "Sem Interesse",
-                "Número Inválido"
-            ]
-        )
-    with c_reg2:
-        obs_tratativa = st.text_input(
-            "Observação / Retorno do Motorista (Opcional):",
-            placeholder="Ex: Confirmou presença para amanhã às 11h / Pediu vaga para segunda..."
-        )
-    with c_reg3:
-        endereco_hub_input = st.text_input(
-            "📍 Endereço do HUB / Local:",
-            "Av. dos Estados, 7328 - Santo André / SP"
-        )
-
-    c_dt1, c_dt2, c_btn_reg = st.columns([1, 1, 2])
-    with c_dt1:
-        dt_ag = st.date_input("Data da Reunião / Contato", value=datetime.now())
-    with c_dt2:
-        hr_ag = st.time_input("Horário", value=datetime.now().time())
-    with c_btn_reg:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        if st.button(f"💾 REGISTRAR SITUAÇÃO DE {len(drivers_marcados)} DRIVER(S) NO HISTÓRICO", type="primary", use_container_width=True):
-            if drivers_marcados.empty:
-                st.warning("Marque pelo menos 1 motorista na coluna 'Selecionar' da tabela acima!")
-            else:
-                novos_registros = []
-                agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-                for _, r in drivers_marcados.iterrows():
-                    novos_registros.append({
-                        "Driver ID": str(r["Driver ID"]),
-                        "Nome": str(r["Nome do Motorista"]),
-                        "Telefone": str(r["Telefone"]),
-                        "Veiculo": str(r["Veículo"]),
-                        "Data Acionamento": agora_str,
-                        "Data Reunião": dt_ag.strftime("%d/%m/%Y"),
-                        "Horário": hr_ag.strftime("%H:%M"),
-                        "Status": situacao_acionamento,
-                        "Observação / Tratativa": obs_tratativa,
-                        "Endereço HUB / Pauta": endereco_hub_input
-                    })
-
-                if registrar_acionamentos_lote:
-                    registrar_acionamentos_lote(novos_registros)
-                    st.session_state["selecionar_todos_flag"] = False
-                    st.toast(f"✅ {len(novos_registros)} registro(s) salvos como '{situacao_acionamento}'!", icon="💾")
-                    st.rerun()
 
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
 footer_html = f'''
