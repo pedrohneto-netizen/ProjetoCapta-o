@@ -154,13 +154,6 @@ st.markdown("""
         text-align: center;
     }
 
-    .sidebar-logo {
-        max-height: 75px;
-        width: auto;
-        margin-bottom: 6px;
-        filter: drop-shadow(0 0 8px rgba(238, 77, 45, 0.5));
-    }
-
     .sidebar-title {
         color: #FFFFFF;
         font-weight: 800;
@@ -199,10 +192,19 @@ st.markdown("""
 
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_filename):
+    base_dir = Path(__file__).resolve().parent
     possible_paths = [
+        base_dir / image_filename,
         Path(image_filename),
-        Path(r'C:\Users\SPXBR30056\Desktop\Projeto Captação Churn') / image_filename
+        base_dir / "assets" / image_filename,
+        base_dir / "images" / image_filename,
+        base_dir / "img" / image_filename,
     ]
+    if base_dir.exists():
+        for f in base_dir.iterdir():
+            if f.is_file() and f.name.lower() == image_filename.lower():
+                possible_paths.insert(0, f)
+
     for path in possible_paths:
         if path.exists():
             ext = path.suffix.lower().replace('.', '')
@@ -213,13 +215,24 @@ def get_base64_image_cached(image_filename):
     return ''
 
 
-img_logo_oficial = get_base64_image_cached('Formula 1_2_2.jpg') or get_base64_image_cached('Formula 1_2.jpg')
-img_shopito_entregador = get_base64_image_cached('GIF-21-entregador.jpg')
+img_logo_oficial = (
+    get_base64_image_cached('Formula 1_2_2.jpg')
+    or get_base64_image_cached('Formula 1_2.jpg')
+    or get_base64_image_cached('formula_1_2_2.jpg')
+    or get_base64_image_cached('Formula 1_2_2.png')
+)
+img_shopito_entregador = (
+    get_base64_image_cached('GIF-21-entregador.jpg')
+    or get_base64_image_cached('GIF-21-entregador.png')
+)
 
 # ==========================================
 # 3. MENU LATERAL & IDENTIFICAÇÃO DO ANALISTA
 # ==========================================
-sidebar_img_html = f'<img src="{img_logo_oficial}" class="sidebar-logo" alt="Logo SPX">' if img_logo_oficial else '🏎️'
+sidebar_img_html = (
+    f'<img src="{img_logo_oficial}" style="width: 95px; height: 95px; object-fit: cover; border-radius: 50%; border: 2px solid #EE4D2D; box-shadow: 0 0 12px rgba(238,77,45,0.6); margin-bottom: 8px;" alt="Logo SPX">'
+    if img_logo_oficial else '🏎️'
+)
 
 st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
@@ -600,7 +613,10 @@ def encontrar_colunas(cols):
     return d_col, dt_col
 
 
-header_img_html = f'<img src="{img_logo_oficial}" style="height: 90px; filter: drop-shadow(0 0 10px rgba(238,77,45,0.6));" alt="Logo SPX">' if img_logo_oficial else '🏎️'
+header_img_html = (
+    f'<img src="{img_logo_oficial}" style="width: 105px; height: 105px; object-fit: cover; border-radius: 16px; border: 2px solid rgba(255,255,255,0.25); box-shadow: 0 0 18px rgba(0,0,0,0.6);" alt="Logo SPX">'
+    if img_logo_oficial else '🏎️'
+)
 
 header_html = f'''
 <div style="background: linear-gradient(135deg, #1A1A1A 0%, #2A0800 60%, #EE4D2D 100%); border-bottom: 3px solid #EE4D2D; padding: 18px 30px; border-radius: 16px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 20px rgba(238,77,45,0.3);">
@@ -867,7 +883,7 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
         use_container_width=True
     )
 
-img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px;">' if img_shopito_entregador else ''
+img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px; border-radius: 8px;">' if img_shopito_entregador else ''
 footer_html = f'''
 <div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: space-between;">
     <div style="display:flex; align-items:center; gap: 12px;">{img_footer_html} <span style="color:#FFF; font-weight:700;">SPX Logistics</span></div>
