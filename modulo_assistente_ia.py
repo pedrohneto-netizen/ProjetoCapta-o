@@ -1,131 +1,195 @@
-from datetime import datetime
 import os
 import re
+import unicodedata
 import pandas as pd
 import streamlit as st
 
 ARQUIVO_HISTORICO = "historico_reengajamento.csv"
 
 
-def analisar_dados_tempo_real() -> str:
-    """Lê os dados atuais da sessão e do CSV para gerar diagnósticos instantâneos."""
-    linhas = []
+def normalizar_texto(texto: str) -> str:
+    """Remove acentos, pontuação e converte para minúsculas para interpretação flexível."""
+    texto = unicodedata.normalize("NFKD", texto).encode("ASCII", "ignore").decode("utf-8")
+    texto = re.sub(r"[^\w\s]", " ", texto.lower())
+    return " ".join(texto.split())
 
-    if "df_analise_cache" in st.session_state:
+
+BASE_CONHECIMENTO_SISTEMA = [
+    {
+        "tema": "Inserção e Upload de Bases (CSV / ZIP)",
+        "tags": ["inserir", "base", "bases", "upload", "carregar", "subir", "arquivo", "csv", "zip", "importar", "planilha", "rotas", "motoristas", "comecar", "iniciar"],
+        "resposta": """### 📂 Como Inserir e Processar as Bases no Sistema
+
+Para alimentar o **Control Tower Churn**, siga estes 4 passos na aba **📊 Control Tower Churn**:
+
+1. **1. Base de Motoristas (CSV):** Clique em *Upload CSV motoristas* e selecione o arquivo exportado do sistema SPX. O sistema filtra automaticamente apenas os motoristas com status **`Active`**.
+2. **2. Histórico de Rotas (ZIP ou CSV):** Clique em *Upload histórico rotas*. Você pode subir **um ou vários arquivos** simultaneamente (`.zip` ou `.csv`).
+3. **Data de Referência:** Confirme ou ajuste a data base de corte no campo *Data de Referência*.
+4. **Gerar Painel:** Clique no botão laranja **🚀 GERAR ANÁLISE E TRAVAR PAINEL NA SESSÃO**. As bases ficarão fixas na tela até você clicar em **🗑️ Limpar / Trocar Bases Importadas**."""
+    },
+    {
+        "tema": "Regras de Classificação de Inatividade (Ativo, Alerta, Churn)",
+        "tags": ["regra", "regras", "classificacao", "classificar", "ativo", "alerta", "churn", "sem rotas", "dias", "criterio", "inatividade", "significa"],
+        "resposta": """### 📏 Regras de Classificação de Inatividade (LSP93)
+
+O sistema calcula a diferença em dias entre a **Data de Referência** e a **Última Rota (AT)** de cada motorista ativo:
+
+- 🟢 **Operacional / Ativo (0 a 7 dias):** Motorista operando regularmente na semana.
+- 🟡 **Em Alerta (8 a 20 dias):** Sinal amarelo de afastamento. Momento ideal para contato preventivo.
+- 🔴 **Inativo / Churn (> 20 dias):** Motorista afastado há mais de 20 dias. Foco prioritário para resgate e treinamento presencial.
+- ⚪ **Sem Histórico de AT:** Motorista com cadastro `Active`, mas sem nenhuma rota registrada nos arquivos importados."""
+    },
+    {
+        "tema": "Filtros, KPIs e Busca na Tabela Gerencial",
+        "tags": ["filtrar", "filtro", "buscar", "busca", "pesquisar", "kpi", "card", "veiculo", "fiorino", "moto", "passeio", "van", "tabela", "encontrar"],
+        "resposta": """### 🔍 Como Filtrar e Localizar Motoristas no Painel
+
+1. **Cards KPI no Topo:** Clique nos botões abaixo dos números (*Filtrar Todos*, *Filtrar Ativos*, *Filtrar Alerta*, *Filtrar Churn* ou *Filtrar Sem Rotas*) para isolar cada grupo.
+2. **Busca Rápida:** Digite qualquer parte do **Nome** ou do **Driver ID** no campo *🔍 Busca Rápida*.
+3. **Filtro por Tipo de Veículo:** Use o seletor *🚗 Tipo de Veículo* para filtrar apenas *MOTO*, *FIORINO*, *PASSEIO*, *VAN*, etc.
+4. **Limpar:** Clique em **🔄 Resetar Filtros** para voltar à visão completa."""
+    },
+    {
+        "tema": "Acionamento via WhatsApp e Janela Pop-up de Registro",
+        "tags": ["acionar", "whatsapp", "whats", "contato", "chamar", "popup", "janela", "analista", "tipo"],
+        "resposta": """### 📲 Como Acionar Motoristas no WhatsApp (Passo a Passo)
+
+1. Preencha seu nome no campo **👤 Analista Responsável** no menu lateral esquerdo.
+2. Na aba **📊 Control Tower Churn**, escolha o motorista na lista **Acionar Motorista no WhatsApp** e clique em **📲 CHAMAR NO WHATS (REGISTRAR)**.
+3. Na janela que abrir, confirme o **Analista**, escolha o **Tipo de Acionamento**, ajuste data/horário/HUB se necessário e clique em **✅ GRAVAR NO HISTÓRICO E LIBERAR WHATSAPP**.
+4. Clique em **🚀 ABRIR CONVERSA NO WHATSAPP AGORA** para enviar a mensagem pronta."""
+    },
+    {
+        "tema": "Dashboard de Reengajamento, Atualização de Status e Relatórios",
+        "tags": ["status", "reintegracao", "reintegrado", "confirmado", "faltou", "sem interesse", "driver acionado", "aguardando", "atualizar", "historico", "relatorio", "exportar", "excel"],
+        "resposta": """### 🔄 Histórico, Atualização de Retornos e Relatórios
+
+Na aba **📅 Reengajamento & Histórico**, você visualiza todos os motoristas acionados pela equipe:
+
+- **Editar Retorno:** Dê um duplo clique nas colunas **Status (Editar)** ou **Observação / Retorno (Editar)** e clique em **💾 SALVAR ALTERAÇÕES** — o sistema carimba automaticamente a **Data e Hora** da atualização.
+- **Extrair Relatório:** Use os botões na parte inferior da página para baixar a **Visão Filtrada** ou o **Histórico Completo** em formato pronto para Excel."""
+    }
+]
+
+
+def consultar_dados_reais(pergunta_norm: str) -> str | None:
+    tem_base = "df_analise_cache" in st.session_state
+    tem_hist = os.path.exists(ARQUIVO_HISTORICO)
+
+    if any(k in pergunta_norm for k in ["resumo", "numero", "numeros", "indicador", "kpi", "taxa", "quanto", "quantos", "total", "hoje", "panorama", "situacao"]):
+        blocos = []
+        if tem_base:
+            df = st.session_state["df_analise_cache"]
+            col_veh = st.session_state.get("col_veh_name", "Vehicle Type")
+            total = len(df)
+            ativos = len(df[df["Status_Inatividade"] == "Ativo"])
+            alerta = len(df[df["Status_Inatividade"] == "Alerta"])
+            churn = len(df[df["Status_Inatividade"] == "Churn"])
+            sem_rotas = len(df[df["Status_Inatividade"] == "Sem Rotas"])
+            taxa_churn = (churn / total * 100) if total > 0 else 0
+
+            blocos.append("### 📊 Panorama Atual da Base Carregada")
+            blocos.append(f"- **Total de Motoristas Ativos:** {total:,}")
+            blocos.append(f"- 🟢 **Operacionais (0-7d):** {ativos:,} ({ativos/total*100:.1f}%)" if total else "- Operacionais: 0")
+            blocos.append(f"- 🟡 **Em Alerta (8-20d):** {alerta:,}")
+            blocos.append(f"- 🔴 **Inativos / Churn (>20d):** {churn:,} (**{taxa_churn:.1f}%** da base)")
+            blocos.append(f"- ⚪ **Sem Histórico de AT:** {sem_rotas:,}")
+
+            if col_veh in df.columns:
+                criticos = df[df["Status_Inatividade"].isin(["Alerta", "Churn"])]
+                if not criticos.empty:
+                    top_veh = criticos[col_veh].value_counts().to_dict()
+                    detalhe_veh = ", ".join([f"**{k}**: {v}" for k, v in top_veh.items()])
+                    blocos.append(f"- 🚗 **Críticos (Alerta + Churn) por Veículo:** {detalhe_veh}")
+        else:
+            blocos.append("⚠️ **Base principal não carregada:** Faça o upload dos arquivos na aba **Control Tower Churn** para que eu leia os números da frota.")
+
+        if tem_hist:
+            try:
+                df_h = pd.read_csv(ARQUIVO_HISTORICO, dtype=str)
+                if not df_h.empty:
+                    cont = df_h["Status"].value_counts().to_dict()
+                    blocos.append("\n### 📅 Histórico de Acionamentos da Equipe")
+                    for st_nome, qtd in cont.items():
+                        blocos.append(f"- **{st_nome}:** {qtd} motorista(s)")
+            except Exception:
+                pass
+
+        return "\n".join(blocos)
+
+    if any(k in pergunta_norm for k in ["listar", "lista", "quais motoristas", "quem esta", "prioridade", "criticos"]):
+        if not tem_base:
+            return "⚠️ Carregue a base de motoristas e rotas na aba **Control Tower Churn** primeiro para que eu possa listar os motoristas prioritários."
         df = st.session_state["df_analise_cache"]
+        col_id = st.session_state.get("col_driver_id_name", "Driver ID")
+        col_name = st.session_state.get("col_driver_name_col", "Driver Name")
         col_veh = st.session_state.get("col_veh_name", "Vehicle Type")
+        criticos = df[df["Status_Inatividade"].isin(["Churn", "Alerta"])].head(10)
+        if criticos.empty:
+            return "🟢 Excelente! Não há motoristas em status **Churn** ou **Alerta** na base carregada."
+        linhas = ["### 🎯 Top 10 Motoristas Prioritários para Acionamento (Maior Inatividade)\n"]
+        for _, r in criticos.iterrows():
+            linhas.append(f"- **{r.get(col_name, 'N/I')}** (`ID: {r[col_id]}`) — {r.get(col_veh, 'N/I')} | **{r['Dias_Sem_AT_Fmt']}** ({r['Status_Inatividade']})")
+        return "\n".join(linhas)
 
-        total = len(df)
-        ativos = len(df[df["Status_Inatividade"] == "Ativo"])
-        alerta = len(df[df["Status_Inatividade"] == "Alerta"])
-        churn = len(df[df["Status_Inatividade"] == "Churn"])
-        sem_rotas = len(df[df["Status_Inatividade"] == "Sem Rotas"])
-
-        taxa_churn = (churn / total * 100) if total > 0 else 0
-
-        linhas.append("### 📊 Diagnóstico da Base Carregada Hoje")
-        linhas.append(f"- **Total de Motoristas Ativos na Base:** {total:,}")
-        linhas.append(f"- **Operacionais (0 a 7 dias):** {ativos:,} ({ativos/total*100:.1f}%)" if total else "- Operacionais: 0")
-        linhas.append(f"- **Em Alerta (8 a 20 dias):** {alerta:,} *(Prioridade preventiva)*")
-        linhas.append(f"- **Inativos / Churn (>20 dias):** {churn:,} (**{taxa_churn:.1f}%** da frota)")
-        linhas.append(f"- **Sem Histórico de Rotas:** {sem_rotas:,}")
-
-        if col_veh in df.columns:
-            criticos = df[df["Status_Inatividade"].isin(["Alerta", "Churn"])]
-            if not criticos.empty:
-                top_veh = criticos[col_veh].value_counts().head(3).to_dict()
-                resumo_veh = ", ".join([f"**{k}** ({v})" for k, v in top_veh.items()])
-                linhas.append(f"- **Veículos mais afetados (Alerta + Churn):** {resumo_veh}")
-    else:
-        linhas.append("### 📊 Diagnóstico da Base")
-        linhas.append("⚠️ Nenhuma base foi carregada ainda na aba **Control Tower Churn**. Faça o upload dos arquivos CSV/ZIP para eu analisar os números do dia!")
-
-    if os.path.exists(ARQUIVO_HISTORICO):
-        try:
-            df_h = pd.read_csv(ARQUIVO_HISTORICO, dtype=str)
-            if not df_h.empty:
-                contagem = df_h["Status"].value_counts().to_dict()
-                linhas.append("\n### 📅 Status da Fila de Reengajamento")
-                for st_nome, qtd in contagem.items():
-                    linhas.append(f"- **{st_nome}:** {qtd} motorista(s)")
-        except Exception:
-            pass
-
-    return "\n".join(linhas)
+    return None
 
 
-def gerar_scripts_whatsapp(hub_endereco: str = "HUB Santo André - Av. dos Estados, 7328") -> str:
-    """Gera modelos prontos de abordagem para diferentes perfis de inatividade."""
-    return f"""### 📲 Modelos Prontos para Disparo no WhatsApp
+def gerar_scripts_whatsapp() -> str:
+    return """### 📲 Templates Prontos de WhatsApp (Copie e Use)
 
-**Opção 1 — Motoristas em Churn (>20 dias inativos) | Foco em Retorno:**
-> Olá! Tudo bem? Aqui é da equipe de Frota da **SPX Logistics (LSP93)**. Notamos que faz um tempo desde a sua última rota conosco e gostaríamos de te convidar para um alinhamento presencial rápido no nosso galpão para liberar novas oportunidades de carregamento!
-> 📍 **Local:** {hub_endereco}
-> Responda **SIM** para confirmarmos seu horário!
+**1. Convocação para Treinamento Presencial (Churn >20 dias):**
+> Olá! Tudo bem? Aqui é da equipe de Frota da **SPX Logistics (LSP93)**. Notamos que você está há alguns dias sem rodar conosco e queremos te convidar para um treinamento presencial rápido de reintegração no nosso HUB para liberar novas rotas!
+> 📍 **Local:** Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP
+> Responda **SIM** para confirmarmos sua vaga!
 
 ---
 
-**Opção 2 — Motoristas em Alerta (8 a 20 dias) | Prevenção de Abandono:**
-> Fala, parceiro(a)! Tudo certo? A equipe **SPX Logistics** sentiu sua falta nas rotas desta semana. Estamos com alta demanda de pacotes na região e queremos alinhar seu retorno no HUB.
-> 📍 **Endereço:** {hub_endereco}
-> Podemos contar com você nos próximos dias?
+**2. Abordagem Preventiva (Motoristas em Alerta 8 a 20 dias):**
+> Fala, parceiro(a)! Tudo certo? A equipe **SPX Logistics** sentiu sua falta nas rotas desta semana. Estamos com volume alto de pacotes na região e queremos alinhar seu retorno no galpão. Podemos contar com você nos próximos dias?
 
 ---
 
-**Opção 3 — Lembrete de Treinamento Presencial Agendado:**
-> Olá! Passando para lembrar do seu **Treinamento Presencial SPX Logistics**.
-> 📍 **Local:** {hub_endereco}
-> Por favor, chegue com 10 minutos de antecedência e traga documento com foto e CNH. Te esperamos lá!"""
+**3. Confirmação de Presença (Dia anterior ao Treinamento):**
+> Olá! Passando para confirmar seu **Treinamento Presencial SPX Logistics** amanhã. Lembre-se de levar documento original com foto e CNH válida, chegando 10 minutos antes. Te esperamos no HUB!"""
 
 
 def responder_duvida_inteligente(pergunta: str) -> str:
-    """Motor de resposta baseado em intenção e dados reais da sessão."""
-    p = pergunta.lower().strip()
+    p_norm = normalizar_texto(pergunta)
+    palavras_usuario = set(p_norm.split())
 
-    # 1. Intenção: Análise de dados / Resumo / Números / Churn
-    if any(k in p for k in ["resumo", "dado", "numero", "número", "churn", "analise", "análise", "status", "hoje", "frota", "veiculo", "veículo"]):
-        return analisar_dados_tempo_real()
-
-    # 2. Intenção: Scripts / Mensagens / WhatsApp / Texto
-    if any(k in p for k in ["mensagem", "script", "texto", "whatsapp", "whats", "convite", "abordagem"]):
+    if any(k in p_norm for k in ["script", "mensagem", "mensagens", "modelo", "texto", "template", "convite", "abordagem"]):
         return gerar_scripts_whatsapp()
 
-    # 3. Intenção: Disparo em massa / Extensão / Como enviar
-    if any(k in p for k in ["massa", "extensao", "extensão", "disparar", "enviar", "csv", "wa web", "waplus"]):
-        return """### ⚡ Como Disparar Mensagens em Massa (Passo a Passo)
+    resp_dados = consultar_dados_reais(p_norm)
+    if resp_dados:
+        return resp_dados
 
-1. Na aba **Control Tower Churn**, marque a caixa **Acionar em Massa** ao lado dos motoristas desejados.
-2. Preencha o **Endereço do HUB**, **Data** e **Horário** do treinamento presencial logo abaixo da tabela e clique em **Direcionar para o Agendamento**.
-3. Na aba **Reengajamento & Reuniões**, clique em **📥 Baixar Arquivo de Envio para a Extensão (.CSV)**.
-4. Abra o **WhatsApp Web** no Chrome, ative sua extensão (**WA Web Plus** ou **WAPlus**), importe o CSV baixado (colunas `Phone` e `Message`) e inicie o envio com intervalo de 3 a 5 segundos.
-5. Volte ao painel e clique em **✅ Marcar Fila Exportada como 'Driver Acionado'** para atualizar o histórico."""
+    melhor_item = None
+    maior_pontuacao = 0
 
-    # 4. Intenção: Regras de classificação / O que é Alerta / Churn / Sem Rotas
-    if any(k in p for k in ["regra", "classifica", "alerta", "ativo", "sem rota", "dias", "significa"]):
-        return """### 📏 Regras de Classificação de Inatividade (LSP93)
+    for item in BASE_CONHECIMENTO_SISTEMA:
+        tags = set(item["tags"])
+        matches = palavras_usuario.intersection(tags)
+        pontuacao = len(matches)
 
-O sistema cruza a base de motoristas com status **Active** contra a data mais recente de rota encontrada nos arquivos de histórico:
+        for tag in tags:
+            if " " in tag and tag in p_norm:
+                pontuacao += 2
 
-- 🟢 **Operacional / Ativo (0 a 7 dias):** Motorista rodando regularmente.
-- 🟡 **Em Alerta (8 a 20 dias):** Início de afastamento; ideal para contato preventivo antes que migre para outro aplicativo.
-- 🔴 **Churn (> 20 dias):** Motorista inativo; foco principal das convocações de treinamento presencial e reintegração.
-- ⚪ **Sem Histórico:** Motorista ativo no cadastro, mas sem nenhuma rota registrada nos arquivos importados."""
+        if pontuacao > maior_pontuacao:
+            maior_pontuacao = pontuacao
+            melhor_item = item
 
-    # 5. Intenção: Alterar status / Editar / Endereço / Presencial
-    if any(k in p for k in ["alterar", "mudar", "editar", "endereco", "endereço", "hub", "horario", "horário", "presencial"]):
-        return """### 🛠️ Como Editar Status, Horários e Endereço do HUB
+    if melhor_item and maior_pontuacao >= 1:
+        return melhor_item["resposta"]
 
-- **No momento do agendamento:** Na aba **Control Tower Churn**, antes de enviar a fila, digite o endereço completo do HUB no campo **📍 Endereço do HUB / Local do Treinamento**.
-- **Edição posterior (Individual):** Na aba **Reengajamento & Reuniões**, vá até a tabela **📊 Histórico Geral & Atualização de Status** e dê um duplo clique em qualquer célula (*Status*, *Data Reunião*, *Horário* ou *Local HUB*) para editar. Depois clique em **💾 Salvar Alterações Manuais**.
-- **Atualização em lote:** Use o botão **✅ Marcar Fila Exportada como 'Driver Acionado'** para atualizar todos os registros da fila de uma só vez."""
+    temas_disponiveis = "\n".join([f"- **{item['tema']}**" for item in BASE_CONHECIMENTO_SISTEMA])
+    return f"""Não encontrei uma correspondência exata para *"{pergunta}"*, mas como especialista do **SPX Control Tower Churn**, posso te orientar sobre qualquer um destes tópicos:
 
-    # Resposta padrão orientativa
-    return """Não identifiquei um comando específico, mas posso te ajudar imediatamente com:
-
-1. **📊 Análise em Tempo Real:** Pergunte *"Qual o resumo dos dados de hoje?"* para ver a taxa de churn e os veículos mais afetados.
-2. **📲 Scripts de WhatsApp:** Peça *"Crie mensagens de WhatsApp"* para gerar convites prontos.
-3. **⚡ Guia de Disparo em Massa:** Pergunte *"Como disparar em massa pela extensão?"*.
-4. **📏 Regras do Painel:** Pergunte *"Quais são as regras de classificação?"* ou *"Como editar status e endereço do HUB?"*."""
+{temas_disponiveis}
+- **Análise dos Números de Hoje & Lista de Prioritários**
+- **Modelos de Mensagens para WhatsApp**"""
 
 
 def renderizar_modulo_ia():
@@ -133,10 +197,10 @@ def renderizar_modulo_ia():
         <div style="background: linear-gradient(135deg, #1E1E1E 0%, #2A0800 100%); border: 1px solid #EE4D2D; box-shadow: 0 0 15px rgba(238, 77, 45, 0.35); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div>
-                    <h2 style='color: #EE4D2D; font-weight: 800; margin: 0;'>🤖 SPX Copilot — Assistente Operacional Interno</h2>
-                    <p style='color: #CCC; font-size: 0.9rem; margin-top: 5px; margin-bottom: 0;'>100% Nativo • Sem necessidade de API externa • Leitura em tempo real da base LSP93.</p>
+                    <h2 style='color: #EE4D2D; font-weight: 800; margin: 0;'>🤖 SPX Copilot — Especialista do Sistema (LSP93)</h2>
+                    <p style='color: #CCC; font-size: 0.9rem; margin-top: 5px; margin-bottom: 0;'>Base de Conhecimento Completa • Leitura em Tempo Real dos Dados • 100% Nativo.</p>
                 </div>
-                <span style="background: #00E676; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem;">⚡ OFFLINE / NATIVO</span>
+                <span style="background: #00E676; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem;">⚡ ATIVO</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -145,27 +209,29 @@ def renderizar_modulo_ia():
         st.session_state["mensagens_ia_spx"] = [
             {
                 "role": "assistant",
-                "content": "Fala, equipe **LSP93**! 👋 Sou o **SPX Copilot** integrado ao painel. Como não precisamos de API externa, já estou pronto para analisar os dados carregados hoje, tirar dúvidas do sistema ou gerar scripts de WhatsApp. Use os botões rápidos abaixo ou digite sua dúvida!"
+                "content": "Olá, equipe **LSP93**! 👋 Sou o **SPX Copilot**, treinado com toda a documentação e regras do **Control Tower Churn**.\n\nVocê pode me perguntar **qualquer dúvida sobre o funcionamento do sistema** (upload de bases, filtros, acionamentos, histórico e relatórios) ou pedir o **resumo dos dados carregados hoje**!"
             }
         ]
 
-    # Botões de Atalho Rápido
-    st.caption("⚡ **Consultas Rápidas (1 Clique):**")
-    c1, c2, c3, c4 = st.columns(4)
+    st.caption("⚡ **Perguntas Frequentes (1 Clique):**")
+    c1, c2, c3, c4, c5 = st.columns(5)
     prompt_selecionado = None
 
     with c1:
-        if st.button("📊 Resumo dos Dados Hoje", use_container_width=True):
-            prompt_selecionado = "Resumo dos dados de hoje"
+        if st.button("📂 Como inserir bases?", use_container_width=True):
+            prompt_selecionado = "Como inserir as bases?"
     with c2:
-        if st.button("📲 Scripts WhatsApp", use_container_width=True):
-            prompt_selecionado = "Gerar scripts de WhatsApp"
+        if st.button("📊 Resumo de Hoje", use_container_width=True):
+            prompt_selecionado = "Qual o resumo dos dados de hoje?"
     with c3:
-        if st.button("⚡ Guia Disparo em Massa", use_container_width=True):
-            prompt_selecionado = "Como disparar em massa?"
+        if st.button("🎯 Top 10 Críticos", use_container_width=True):
+            prompt_selecionado = "Listar motoristas prioritários"
     with c4:
-        if st.button("📏 Regras & Edição HUB", use_container_width=True):
-            prompt_selecionado = "Quais são as regras de classificação?"
+        if st.button("📲 Como acionar driver?", use_container_width=True):
+            prompt_selecionado = "Como acionar motoristas no WhatsApp?"
+    with c5:
+        if st.button("📝 Scripts WhatsApp", use_container_width=True):
+            prompt_selecionado = "Gerar scripts de WhatsApp"
 
     st.divider()
 
@@ -174,7 +240,7 @@ def renderizar_modulo_ia():
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    user_input = st.chat_input("Digite sua dúvida sobre o sistema, peça o resumo do churn ou scripts...")
+    user_input = st.chat_input("Pergunte qualquer coisa sobre o sistema (ex: como inserir bases, regras de churn, histórico...)")
     pergunta_final = prompt_selecionado if prompt_selecionado else user_input
 
     if pergunta_final:
