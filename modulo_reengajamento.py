@@ -6,16 +6,20 @@ import streamlit as st
 ARQUIVO_HISTORICO = "historico_reengajamento.csv"
 
 COLUNAS_HISTORICO = [
+    "ID Registro",
     "Driver ID",
     "Nome",
     "Telefone",
     "Veiculo",
-    "Data Acionamento",
+    "Analista Responsável",
+    "Tipo de Acionamento",
+    "Data/Hora Acionamento",
+    "Status",
+    "Última Atualização",
+    "Observação / Tratativa",
     "Data Reunião",
     "Horário",
-    "Status",
-    "Observação / Tratativa",
-    "Endereço HUB / Pauta"
+    "Endereço HUB"
 ]
 
 
@@ -39,11 +43,41 @@ def salvar_historico(df: pd.DataFrame):
     df[COLUNAS_HISTORICO].to_csv(ARQUIVO_HISTORICO, index=False, encoding="utf-8-sig")
 
 
-def registrar_acionamentos_lote(registros: list):
-    """Adiciona ou atualiza acionamentos preservando todo o histórico anterior."""
+def registrar_novo_acionamento(
+    driver_id: str,
+    nome: str,
+    telefone: str,
+    veiculo: str,
+    analista: str,
+    tipo_acionamento: str,
+    status: str = "Driver Acionado",
+    observacao: str = "",
+    data_reuniao: str = "",
+    horario: str = "",
+    endereco_hub: str = ""
+):
     df_atual = carregar_historico()
-    df_novos = pd.DataFrame(registros)
-    df_combinado = pd.concat([df_novos, df_atual], ignore_index=True)
+    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    id_reg = f"AC-{datetime.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
+
+    novo = pd.DataFrame([{
+        "ID Registro": id_reg,
+        "Driver ID": str(driver_id),
+        "Nome": str(nome),
+        "Telefone": str(telefone),
+        "Veiculo": str(veiculo),
+        "Analista Responsável": str(analista),
+        "Tipo de Acionamento": str(tipo_acionamento),
+        "Data/Hora Acionamento": agora_str,
+        "Status": str(status),
+        "Última Atualização": agora_str,
+        "Observação / Tratativa": str(observacao),
+        "Data Reunião": str(data_reuniao),
+        "Horário": str(horario),
+        "Endereço HUB": str(endereco_hub)
+    }])
+
+    df_combinado = pd.concat([novo, df_atual], ignore_index=True)
     salvar_historico(df_combinado)
 
 
@@ -51,93 +85,66 @@ def renderizar_modulo_reengajamento():
     st.markdown("""
         <div style="background: linear-gradient(135deg, #1E1E1E 0%, #2A0800 100%); border: 1px solid #EE4D2D; box-shadow: 0 0 15px rgba(238, 77, 45, 0.3); padding: 20px; border-radius: 12px; margin-bottom: 25px;">
             <h2 style='color: #EE4D2D; font-weight: 800; margin: 0;'>📅 Histórico de Acionamentos, Tratativas & Relatórios</h2>
-            <p style='color: #AAA; font-size: 0.9rem; margin-top: 5px;'>Registro permanente de situações, disparo em massa via extensão e extração de relatórios gerenciais.</p>
+            <p style='color: #AAA; font-size: 0.9rem; margin-top: 5px;'>Consulte os acionamentos realizados pela equipe, atualize o retorno do motorista (com data/hora automática) e extraia relatórios.</p>
         </div>
     """, unsafe_allow_html=True)
 
     df_hist = carregar_historico()
 
     if df_hist.empty:
-        st.info("Nenhum acionamento registrado ainda. Vá até a aba **📊 Control Tower Churn**, selecione os motoristas e registre o acionamento.")
+        st.info("Nenhum acionamento registrado ainda. Vá até a aba **📊 Control Tower Churn** e clique para acionar um motorista!")
         return
 
     # ==========================================
-    # 1. MÉTRICAS RÁPIDAS DO HISTÓRICO
+    # 1. KPIs DO HISTÓRICO DA EQUIPE
     # ==========================================
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total de Registros", len(df_hist))
-    m2.metric("Drivers Acionados", len(df_hist[df_hist["Status"] == "Driver Acionado"]))
+    m1.metric("Total Acionados", len(df_hist))
+    m2.metric("Aguardando Retorno", len(df_hist[df_hist["Status"] == "Driver Acionado"]))
     m3.metric("Confirmados / Reintegrados", len(df_hist[df_hist["Status"].isin(["Confirmado", "Reintegrado"])]))
     m4.metric("Sem Resposta / Recusa", len(df_hist[df_hist["Status"].isin(["Sem Resposta", "Sem Interesse", "Número Inválido"])]))
 
     st.divider()
 
     # ==========================================
-    # 2. EXPORTAÇÃO PARA EXTENSÃO WHATSAPP (OPÇÃO A)
+    # 2. FILTROS POR ANALISTA E STATUS
     # ==========================================
-    st.subheader("⚡ 1. Disparo em Massa via Extensão Chrome (Opção A)")
-    
-    lista_export = []
-    for _, r in df_hist[df_hist["Status"].isin(["Aguardando Reunião", "Driver Acionado"])].iterrows():
-        phone = str(r["Telefone"]).strip()
-        if phone and len(phone) >= 10:
-            msg = f"Olá {r['Nome']}! Aqui é da equipe SPX Logistics (LSP93). Confirmamos seu Treinamento Presencial para {r['Data Reunião']} às {r['Horário']}. Local: {r['Endereço HUB / Pauta']}. Responda para confirmar!"
-            lista_export.append(f"{phone};{msg}")
+    st.subheader("📝 1. Atualizar Situação e Retorno do Motorista")
+    st.caption("Altere a coluna **Status** ou **Observação / Tratativa** e clique em **Salvar**. O sistema gravará automaticamente a **Data/Hora da atualização**!")
 
-    csv_extensao = "Phone;Message\n" + "\n".join(lista_export)
-
-    col_exp1, col_exp2 = st.columns(2)
-    with col_exp1:
-        st.download_button(
-            label=f"📥 Baixar CSV para Extensão WhatsApp ({len(lista_export)} contatos)",
-            data=csv_extensao,
-            file_name=f"fila_extensao_spx_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
-            mime="text/csv",
-            type="primary",
-            use_container_width=True
+    f1, f2 = st.columns(2)
+    with f1:
+        analistas_unicos = ["TODOS"] + sorted(list(set(df_hist["Analista Responsável"].replace("", "Não Informado").unique())))
+        analista_filtro = st.selectbox("Filtrar por Analista Responsável:", analistas_unicos)
+    with f2:
+        status_filtro = st.multiselect(
+            "Filtrar por Status:",
+            options=["Driver Acionado", "Aguardando Reunião", "Sem Resposta", "Confirmado", "Reintegrado", "Faltou", "Sem Interesse", "Número Inválido"],
+            default=[]
         )
-    with col_exp2:
-        if st.button("✅ Marcar 'Aguardando Reunião' como 'Driver Acionado'", use_container_width=True):
-            mask = df_hist["Status"] == "Aguardando Reunião"
-            df_hist.loc[mask, "Status"] = "Driver Acionado"
-            df_hist.loc[mask, "Data Acionamento"] = datetime.now().strftime("%d/%m/%Y %H:%M")
-            salvar_historico(df_hist)
-            st.toast("Status atualizados para 'Driver Acionado'!", icon="✅")
-            st.rerun()
 
-    st.divider()
-
-    # ==========================================
-    # 3. REGISTRO DE SITUAÇÃO & HISTÓRICO EDITÁVEL
-    # ==========================================
-    st.subheader("📝 2. Histórico Completo & Atualização da Situação do Acionamento")
-    st.caption("Dê um duplo clique nas colunas **Status** ou **Observação / Tratativa** para registrar o retorno de cada motorista:")
-
-    filtro_status_hist = st.multiselect(
-        "Filtrar histórico por situação:",
-        options=["Aguardando Reunião", "Driver Acionado", "Sem Resposta", "Confirmado", "Reintegrado", "Faltou", "Sem Interesse", "Número Inválido"],
-        default=[]
-    )
-
-    df_para_editar = df_hist.copy()
-    if filtro_status_hist:
-        df_para_editar = df_para_editar[df_para_editar["Status"].isin(filtro_status_hist)]
+    df_view = df_hist.copy()
+    if analista_filtro != "TODOS":
+        df_view = df_view[df_view["Analista Responsável"].replace("", "Não Informado") == analista_filtro]
+    if status_filtro:
+        df_view = df_view[df_view["Status"].isin(status_filtro)]
 
     df_editado = st.data_editor(
-        df_para_editar,
+        df_view,
         column_config={
+            "ID Registro": None,  # Oculta ID técnico
             "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
             "Nome": st.column_config.TextColumn("Nome do Motorista", disabled=True),
             "Telefone": st.column_config.TextColumn("Telefone", disabled=True),
             "Veiculo": st.column_config.TextColumn("Veículo", disabled=True),
-            "Data Acionamento": st.column_config.TextColumn("Data/Hora Acionamento", disabled=True),
-            "Data Reunião": st.column_config.TextColumn("Data Reunião"),
-            "Horário": st.column_config.TextColumn("Horário"),
+            "Analista Responsável": st.column_config.TextColumn("Analista", disabled=True),
+            "Tipo de Acionamento": st.column_config.TextColumn("Tipo Acionamento", disabled=True),
+            "Data/Hora Acionamento": st.column_config.TextColumn("Data/Hora Inicial", disabled=True),
             "Status": st.column_config.SelectboxColumn(
-                "Situação do Acionamento",
+                "Status Atual",
                 options=[
-                    "Aguardando Reunião",
                     "Driver Acionado",
+                    "Aguardando Reunião",
                     "Sem Resposta",
                     "Confirmado",
                     "Reintegrado",
@@ -147,43 +154,95 @@ def renderizar_modulo_reengajamento():
                 ],
                 required=True
             ),
-            "Observação / Tratativa": st.column_config.TextColumn("Observação / Retorno do Driver", width="large"),
-            "Endereço HUB / Pauta": st.column_config.TextColumn("Local HUB / Pauta")
+            "Última Atualização": st.column_config.TextColumn("Data/Hora Atualização", disabled=True),
+            "Observação / Tratativa": st.column_config.TextColumn("Observação / Retorno", width="large"),
+            "Data Reunião": st.column_config.TextColumn("Data Reunião"),
+            "Horário": st.column_config.TextColumn("Horário"),
+            "Endereço HUB": st.column_config.TextColumn("Endereço HUB")
         },
         hide_index=True,
         use_container_width=True,
-        key="editor_historico_completo"
+        key="editor_historico_equipe"
     )
 
-    if st.button("💾 SALVAR SITUAÇÕES E TRATATIVAS NO HISTÓRICO", type="primary"):
-        df_hist.update(df_editado)
+    if st.button("💾 SALVAR ATUALIZAÇÕES (GRAVA DATA/HORA AUTOMATICAMENTE)", type="primary"):
+        agora_upd = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        alteracoes = 0
+
+        for idx, row_ed in df_editado.iterrows():
+            id_reg = row_ed["ID Registro"]
+            mask = df_hist["ID Registro"] == id_reg
+            if mask.any():
+                idx_orig = df_hist[mask].index[0]
+                status_antigo = df_hist.loc[idx_orig, "Status"]
+                obs_antiga = df_hist.loc[idx_orig, "Observação / Tratativa"]
+
+                # Se mudou status ou observação, atualiza automaticamente data e hora
+                if (
+                    row_ed["Status"] != status_antigo
+                    or row_ed["Observação / Tratativa"] != obs_antiga
+                    or row_ed["Data Reunião"] != df_hist.loc[idx_orig, "Data Reunião"]
+                    or row_ed["Horário"] != df_hist.loc[idx_orig, "Horário"]
+                ):
+                    df_hist.loc[idx_orig, "Status"] = row_ed["Status"]
+                    df_hist.loc[idx_orig, "Observação / Tratativa"] = row_ed["Observação / Tratativa"]
+                    df_hist.loc[idx_orig, "Data Reunião"] = row_ed["Data Reunião"]
+                    df_hist.loc[idx_orig, "Horário"] = row_ed["Horário"]
+                    df_hist.loc[idx_orig, "Endereço HUB"] = row_ed["Endereço HUB"]
+                    df_hist.loc[idx_orig, "Última Atualização"] = agora_upd
+                    alteracoes += 1
+
         salvar_historico(df_hist)
-        st.toast("Histórico salvo com sucesso!", icon="💾")
+        if alteracoes > 0:
+            st.toast(f"✅ {alteracoes} registro(s) atualizado(s) às {agora_upd}!", icon="🕒")
+        else:
+            st.toast("Nenhuma alteração pendente detectada.", icon="ℹ️")
         st.rerun()
 
     st.divider()
 
     # ==========================================
-    # 4. EXTRAÇÃO DE RELATÓRIO GERENCIAL (EXCEL / CSV)
+    # 3. EXPORTAÇÃO PARA EXTENSÃO & RELATÓRIO EXCEL
     # ==========================================
-    st.subheader("📊 3. Extrair Relatório Gerencial de Acionamentos")
-    st.caption("Exporte o histórico completo com todas as situações e observações prontas para abrir no Excel:")
+    st.subheader("📊 2. Exportação em Massa & Relatório Gerencial")
 
-    csv_relatorio_excel = df_hist.to_csv(index=False, sep=";", encoding="utf-8-sig")
+    col_b1, col_b2, col_b3 = st.columns(3)
 
-    col_rel1, col_rel2 = st.columns([2, 1])
-    with col_rel1:
+    # CSV para Extensão Chrome
+    lista_ext = []
+    for _, r in df_hist[df_hist["Status"].isin(["Driver Acionado", "Aguardando Reunião"])].iterrows():
+        ph = str(r["Telefone"]).strip()
+        if ph and len(ph) >= 10:
+            msg = f"Olá {r['Nome']}! Aqui é {r['Analista Responsável']} da equipe SPX Logistics (LSP93). Entramos em contato sobre: {r['Tipo de Acionamento']}. Podemos conversar?"
+            lista_ext.append(f"{ph};{msg}")
+    csv_ext = "Phone;Message\n" + "\n".join(lista_ext)
+
+    with col_b1:
+        st.download_button(
+            label=f"📲 Baixar CSV p/ Extensão Whats ({len(lista_ext)})",
+            data=csv_ext,
+            file_name=f"extensao_whats_spx_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    # Relatório Completo Excel
+    df_relatorio = df_hist.drop(columns=["ID Registro"], errors="ignore")
+    csv_rel = df_relatorio.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+    with col_b2:
         st.download_button(
             label="📥 EXTRAIR RELATÓRIO COMPLETO (.CSV / EXCEL)",
-            data=csv_relatorio_excel,
-            file_name=f"Relatorio_Acionamentos_Churn_LSP93_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
+            data=csv_rel,
+            file_name=f"Relatorio_Acionamentos_LSP93_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
             mime="text/csv",
             type="primary",
             use_container_width=True
         )
-    with col_rel2:
-        if st.button("🗑️ Limpar Todo o Histórico", use_container_width=True):
+
+    with col_b3:
+        if st.button("🗑️ Zerar Histórico", use_container_width=True):
             if os.path.exists(ARQUIVO_HISTORICO):
                 os.remove(ARQUIVO_HISTORICO)
-            st.toast("Histórico zerado.", icon="🗑️")
+            st.toast("Histórico limpo.", icon="🗑️")
             st.rerun()
