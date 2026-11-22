@@ -1,5 +1,6 @@
 from datetime import datetime
 import base64
+import io
 import os
 from pathlib import Path
 import re
@@ -7,6 +8,7 @@ import tempfile
 import urllib.parse
 import zipfile
 import pandas as pd
+import requests
 import streamlit as st
 
 try:
@@ -15,18 +17,31 @@ except ImportError:
     renderizar_modulo_ia = None
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA & PERSISTÊNCIA
+# 1. CONFIGURAÇÃO DA PÁGINA & PERSISTÊNCIA POR HUB
 # ==========================================
 st.set_page_config(
-    page_title="SPX - Control Tower Churn (LSP93)",
+    page_title="SPX - Control Tower Churn (Multi-HUB)",
     page_icon="🏎️",
     layout="wide",
 )
 
-ARQUIVO_HISTORICO = "historico_reengajamento.csv"
+HUBS_PREDEFINIDOS = [
+    "LSP-93",
+    "LSP-133",
+    "LSP-01",
+    "LSP-10",
+    "LSP-50",
+    "Outro HUB (Digitar Código)"
+]
+
+ENDERECOS_HUB = {
+    "LSP-93": "Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP",
+    "LSP-133": "HUB SPX Logistics - LSP-133",
+}
 
 COLUNAS_HISTORICO = [
     "ID Registro",
+    "HUB",
     "Driver ID",
     "Nome",
     "Telefone",
@@ -43,35 +58,164 @@ COLUNAS_HISTORICO = [
 ]
 
 
-def carregar_historico() -> pd.DataFrame:
-    """Lê o CSV de histórico e garante sincronia com o estado da sessão."""
-    if os.path.exists(ARQUIVO_HISTORICO):
+def sanitizar_hub(hub_code: str) -> str:
+    limpo = re.sub(r"[^A-Za-z0-9\-]", "", str(hub_code).upper().strip())
+    return limpo if limpo else "LSP-93"
+
+
+def get_caminhos_hub(hub_code: str):
+    h = sanitizar_hub(hub_code)
+    pasta_local = Path("dados_hubs") / h
+    pasta_local.mkdir(parents=True, exist_ok=True)
+    return {
+        "hub": h,
+        "local_hist": str(pasta_local / f"historico_{h}.csv"),
+        "local_base": str(pasta_local / f"base_drivers_{h}.csv.gz"),
+        "repo_hist": f"dados_hubs/{h}/historico_{h}.csv",
+        "repo_base": f"dados_hubs/{h}/base_drivers_{h}.csv.gz",
+    }
+
+
+# ==========================================
+# MOTOR DE MEMÓRIA PERMANENTE (GITHUB SYNC + LOCAL)
+# ==========================================
+def github_config():
+    try:
+        token = st.secrets.get("GITHUB_TOKEN", "")
+        repo = st.secrets.get("GITHUB_REPO", "")
+        branch = st.secrets.get("GITHUB_BRANCH", "main")
+        return token, repo, branch
+    except Exception:
+        return "", "", "main"
+
+
+def ler_arquivo_github(repo_path: str) -> bytes | None:
+    token, repo, branch = github_config()
+    if not token or not repo:
+        return None
+    url = f"https://api.github.com/repos/{repo}/contents/{repo_path}?ref={branch}"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if "content" in data:
+                return base64.b64decode(data["content"])
+    except Exception:
+        pass
+    return None
+
+
+def gravar_arquivo_github(repo_path: str, content_bytes: bytes, commit_msg: str) -> bool:
+    token, repo, branch = github_config()
+    if not token or not repo:
+        return False
+    url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        sha = None
+        get_resp = requests.get(f"{url}?ref={branch}", headers=headers, timeout=10)
+        if get_resp.status_code == 200:
+            sha = get_resp.json().get("sha")
+
+        payload = {
+            "message": commit_msg,
+            "content": base64.b64encode(content_bytes).decode("utf-8"),
+            "branch": branch,
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = requests.put(url, headers=headers, json=payload, timeout=15)
+        return put_resp.status_code in [200, 201]
+    except Exception:
+        return False
+
+
+def carregar_historico_hub(hub_code: str) -> pd.DataFrame:
+    caminhos = get_caminhos_hub(hub_code)
+    cache_key = f"historico_cache_{caminhos['hub']}"
+
+    # 1. Tenta buscar do GitHub (Memória Permanente) na primeira leitura da sessão
+    if f"sync_hist_done_{caminhos['hub']}" not in st.session_state:
+        bytes_gh = ler_arquivo_github(caminhos["repo_hist"])
+        if bytes_gh:
+            with open(caminhos["local_hist"], "wb") as f:
+                f.write(bytes_gh)
+        st.session_state[f"sync_hist_done_{caminhos['hub']}"] = True
+
+    # 2. Lê do arquivo local sincronizado
+    if os.path.exists(caminhos["local_hist"]):
         try:
-            df = pd.read_csv(ARQUIVO_HISTORICO, dtype=str)
+            df = pd.read_csv(caminhos["local_hist"], dtype=str)
             for col in COLUNAS_HISTORICO:
                 if col not in df.columns:
-                    df[col] = ""
+                    df[col] = caminhos["hub"] if col == "HUB" else ""
             df = df[COLUNAS_HISTORICO].fillna("")
-            st.session_state["historico_cache"] = df
+            st.session_state[cache_key] = df
             return df
         except Exception:
             pass
-    if "historico_cache" in st.session_state:
-        return st.session_state["historico_cache"]
+
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
     return pd.DataFrame(columns=COLUNAS_HISTORICO)
 
 
-def salvar_historico(df: pd.DataFrame):
-    """Salva o histórico no CSV e atualiza o cache da sessão."""
+def salvar_historico_hub(hub_code: str, df: pd.DataFrame):
+    caminhos = get_caminhos_hub(hub_code)
     for col in COLUNAS_HISTORICO:
         if col not in df.columns:
-            df[col] = ""
+            df[col] = caminhos["hub"] if col == "HUB" else ""
     df_limpo = df[COLUNAS_HISTORICO].fillna("")
-    df_limpo.to_csv(ARQUIVO_HISTORICO, index=False, encoding="utf-8-sig")
-    st.session_state["historico_cache"] = df_limpo
+    csv_bytes = df_limpo.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+    with open(caminhos["local_hist"], "wb") as f:
+        f.write(csv_bytes)
+
+    st.session_state[f"historico_cache_{caminhos['hub']}"] = df_limpo
+    gravar_arquivo_github(
+        caminhos["repo_hist"],
+        csv_bytes,
+        f"Atualiza historico HUB {caminhos['hub']} ({datetime.now().strftime('%d/%m/%Y %H:%M')})"
+    )
+
+
+def carregar_base_salva_hub(hub_code: str) -> pd.DataFrame | None:
+    caminhos = get_caminhos_hub(hub_code)
+    if f"sync_base_done_{caminhos['hub']}" not in st.session_state:
+        bytes_gh = ler_arquivo_github(caminhos["repo_base"])
+        if bytes_gh:
+            with open(caminhos["local_base"], "wb") as f:
+                f.write(bytes_gh)
+        st.session_state[f"sync_base_done_{caminhos['hub']}"] = True
+
+    if os.path.exists(caminhos["local_base"]):
+        try:
+            return pd.read_csv(caminhos["local_base"], compression="gzip", dtype=str)
+        except Exception:
+            pass
+    return None
+
+
+def salvar_base_hub(hub_code: str, df_analise: pd.DataFrame):
+    caminhos = get_caminhos_hub(hub_code)
+    buf = io.BytesIO()
+    df_analise.to_csv(buf, index=False, compression="gzip", encoding="utf-8")
+    gz_bytes = buf.getvalue()
+
+    with open(caminhos["local_base"], "wb") as f:
+        f.write(gz_bytes)
+
+    gravar_arquivo_github(
+        caminhos["repo_base"],
+        gz_bytes,
+        f"Salva base de drivers HUB {caminhos['hub']} ({datetime.now().strftime('%d/%m/%Y %H:%M')})"
+    )
 
 
 def registrar_novo_acionamento(
+    hub_code: str,
     driver_id: str,
     nome: str,
     telefone: str,
@@ -84,12 +228,14 @@ def registrar_novo_acionamento(
     horario: str = "",
     endereco_hub: str = ""
 ):
-    df_atual = carregar_historico()
+    hub_limpo = sanitizar_hub(hub_code)
+    df_atual = carregar_historico_hub(hub_limpo)
     agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    id_reg = f"AC-{datetime.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
+    id_reg = f"AC-{hub_limpo}-{datetime.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
 
     novo = pd.DataFrame([{
         "ID Registro": id_reg,
+        "HUB": hub_limpo,
         "Driver ID": str(driver_id),
         "Nome": str(nome),
         "Telefone": str(telefone),
@@ -106,7 +252,7 @@ def registrar_novo_acionamento(
     }])
 
     df_combinado = pd.concat([novo, df_atual], ignore_index=True)
-    salvar_historico(df_combinado)
+    salvar_historico_hub(hub_limpo, df_combinado)
 
 
 # Inicialização de variáveis de sessão
@@ -114,7 +260,8 @@ for key, default in [
     ("pagina_atual", "📊 Control Tower Churn"),
     ("filtro_kpi_status", "TODOS"),
     ("base_travada", False),
-    ("analista_logado", "")
+    ("analista_logado", ""),
+    ("hub_autenticado", "")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -136,6 +283,17 @@ st.markdown("""
         background-color: var(--shopee-dark-bg) !important;
         color: #EEEEEE !important;
         font-family: 'Poppins', sans-serif;
+    }
+
+    /* Oculta o botão "Manage app" e a barra superior do Streamlit Cloud */
+    [data-testid="manage-app-button"],
+    .stAppDeployButton,
+    button[kind="manageApp"],
+    #MainMenu,
+    [data-testid="stToolbar"],
+    [data-testid="stHeaderActionElements"] {
+        display: none !important;
+        visibility: hidden !important;
     }
 
     [data-testid="stSidebar"] {
@@ -163,7 +321,7 @@ st.markdown("""
     .sidebar-badge-prod {
         background: linear-gradient(90deg, #00C853 0%, #00E676 100%);
         color: #121212;
-        font-size: 0.7rem;
+        font-size: 0.72rem;
         font-weight: 800;
         padding: 3px 10px;
         border-radius: 6px;
@@ -186,20 +344,14 @@ st.markdown("""
         font-weight: 800;
         margin-top: 4px;
     }
-/* Oculta o botão "Manage app" no canto inferior direito */
-    [data-testid="manage-app-button"],
-    .stAppDeployButton,
-    button[kind="manageApp"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
 
-    /* Oculta o menu de 3 pontinhos, Share e ícone do GitHub no topo */
-    #MainMenu,
-    [data-testid="stToolbar"],
-    [data-testid="stHeaderActionElements"] {
-        display: none !important;
-        visibility: hidden !important;
+    .login-box {
+        background: linear-gradient(135deg, #1A1A1A 0%, #260A02 100%);
+        border: 2px solid #EE4D2D;
+        border-radius: 18px;
+        padding: 32px;
+        box-shadow: 0 0 30px rgba(238, 77, 45, 0.35);
+        margin-top: 30px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -234,7 +386,6 @@ img_logo_oficial = (
     get_base64_image_cached('Formula 1_2_2.jpg')
     or get_base64_image_cached('Formula 1_2.jpg')
     or get_base64_image_cached('formula_1_2_2.jpg')
-    or get_base64_image_cached('Formula 1_2_2.png')
 )
 img_shopito_entregador = (
     get_base64_image_cached('GIF-21-entregador.jpg')
@@ -242,8 +393,80 @@ img_shopito_entregador = (
 )
 
 # ==========================================
-# 3. MENU LATERAL & IDENTIFICAÇÃO DO ANALISTA
+# 3. TELA DE LOGIN POR HUB (ISOLAMENTO DE OPERAÇÃO)
 # ==========================================
+if not st.session_state["hub_autenticado"]:
+    _, col_login, _ = st.columns([1, 1.6, 1])
+    with col_login:
+        logo_login = (
+            f'<img src="{img_logo_oficial}" style="width: 110px; height: 110px; object-fit: cover; border-radius: 50%; border: 3px solid #EE4D2D; box-shadow: 0 0 18px rgba(238,77,45,0.6); margin-bottom: 12px;">'
+            if img_logo_oficial else '🏎️'
+        )
+        st.markdown(f"""
+        <div class="login-box" style="text-align: center;">
+            {logo_login}
+            <h2 style="color: #FFF; font-weight: 800; margin: 0;">SPX CONTROL TOWER CHURN</h2>
+            <p style="color: #EE4D2D; font-weight: 700; font-size: 0.95rem; margin-top: 4px;">Acesso Operacional Multi-HUB • Fleet Logistics</p>
+            <p style="color: #BBB; font-size: 0.85rem;">Selecione seu HUB e informe seu nome para carregar a memória e o histórico exclusivo da sua unidade.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        hub_escolha = st.selectbox("🏢 Selecione o seu HUB:", HUBS_PREDEFINIDOS, index=0)
+        if hub_escolha == "Outro HUB (Digitar Código)":
+            hub_digitado = st.text_input("Digite o código do HUB:", placeholder="Ex: LSP-145")
+            hub_final_login = sanitizar_hub(hub_digitado)
+        else:
+            hub_final_login = sanitizar_hub(hub_escolha)
+
+        nome_analista_login = st.text_input(
+            "👤 Nome do Analista Responsável:",
+            value=st.session_state.get("analista_logado", ""),
+            placeholder="Ex: Pedro Heleno"
+        )
+
+        # Senha opcional por HUB via st.secrets["SENHAS_HUBS"] se desejar restringir
+        senhas_hubs = {}
+        try:
+            senhas_hubs = dict(st.secrets.get("SENHAS_HUBS", {}))
+        except Exception:
+            senhas_hubs = {}
+
+        senha_digitada = ""
+        if hub_final_login in senhas_hubs:
+            senha_digitada = st.text_input("🔑 Senha de Acesso do HUB:", type="password")
+
+        if st.button("🚀 ENTRAR NO PAINEL DO HUB", type="primary", use_container_width=True):
+            if not hub_final_login:
+                st.error("⚠️ Informe um código de HUB válido (ex: LSP-93).")
+            elif not nome_analista_login.strip():
+                st.error("⚠️ Informe o nome do Analista Responsável para continuar.")
+            elif hub_final_login in senhas_hubs and senha_digitada != str(senhas_hubs[hub_final_login]):
+                st.error("❌ Senha incorreta para este HUB.")
+            else:
+                st.session_state["hub_autenticado"] = hub_final_login
+                st.session_state["analista_logado"] = nome_analista_login.strip()
+                # Carrega automaticamente a última base salva desse HUB na memória permanente
+                with st.spinner(f"Carregando memória e histórico do HUB {hub_final_login}..."):
+                    df_base_salva = carregar_base_salva_hub(hub_final_login)
+                    if df_base_salva is not None and not df_base_salva.empty:
+                        st.session_state["df_analise_cache"] = df_base_salva
+                        st.session_state["col_driver_id_name"] = "ID_LIMPO" if "ID_LIMPO" in df_base_salva.columns else df_base_salva.columns[0]
+                        col_nm = next((c for c in df_base_salva.columns if any(k in c.lower() for k in ['driver name', 'driver_name', 'nome', 'name'])), df_base_salva.columns[1] if len(df_base_salva.columns) > 1 else "ID_LIMPO")
+                        col_vh = next((c for c in df_base_salva.columns if c.lower() in ['vehicle type', 'tipo de veiculo', 'tipo veiculo', 'veiculo']), 'Vehicle Type')
+                        st.session_state["col_driver_name_col"] = col_nm
+                        st.session_state["col_veh_name"] = col_vh
+                        st.session_state["base_travada"] = True
+                st.rerun()
+
+    st.stop()
+
+# ==========================================
+# 4. MENU LATERAL (COM HUB LOGADO & TROCA DE HUB)
+# ==========================================
+HUB_ATUAL = st.session_state["hub_autenticado"]
+
 sidebar_img_html = (
     f'<img src="{img_logo_oficial}" style="width: 95px; height: 95px; object-fit: cover; border-radius: 50%; border: 2px solid #EE4D2D; box-shadow: 0 0 12px rgba(238,77,45,0.6); margin-bottom: 8px;" alt="Logo SPX">'
     if img_logo_oficial else '🏎️'
@@ -253,9 +476,17 @@ st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
     <div style="text-align: center; margin-bottom: 6px;">{sidebar_img_html}</div>
     <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
-    <div class="sidebar-badge-prod">⚡ PRODUÇÃO • LSP93</div>
+    <div class="sidebar-badge-prod">⚡ OFICIAL • {HUB_ATUAL}</div>
 </div>
 """, unsafe_allow_html=True)
+
+st.sidebar.markdown(f"### 🏢 Unidade: **{HUB_ATUAL}**")
+if st.sidebar.button("🔄 Trocar de HUB / Sair", use_container_width=True):
+    for k in ["hub_autenticado", "df_analise_cache", "base_travada", "col_driver_id_name", "col_driver_name_col", "col_veh_name"]:
+        st.session_state.pop(k, None)
+    st.session_state["hub_autenticado"] = ""
+    st.session_state["base_travada"] = False
+    st.rerun()
 
 st.sidebar.markdown("### 👤 Analista Responsável")
 analista_input = st.sidebar.text_input(
@@ -265,12 +496,9 @@ analista_input = st.sidebar.text_input(
 )
 st.session_state["analista_logado"] = analista_input.strip()
 
-if not st.session_state["analista_logado"]:
-    st.sidebar.warning("⚠️ Informe seu nome acima antes de acionar.")
-
 st.sidebar.divider()
 
-df_hist_sidebar = carregar_historico()
+df_hist_sidebar = carregar_historico_hub(HUB_ATUAL)
 qtd_hist = len(df_hist_sidebar)
 
 opcoes_menu = [
@@ -294,32 +522,37 @@ st.session_state["pagina_atual"] = opcao_menu
 
 st.sidebar.divider()
 if st.session_state.get("base_travada") and "df_analise_cache" in st.session_state:
-    st.sidebar.success(f"🔒 Base Carregada ({len(st.session_state['df_analise_cache'])} drivers)")
-    if st.sidebar.button("🗑️ Limpar / Trocar Bases Importadas", use_container_width=True):
+    st.sidebar.success(f"🔒 Memória Ativa {HUB_ATUAL} ({len(st.session_state['df_analise_cache'])} drivers)")
+    if st.sidebar.button("🗑️ Atualizar / Substituir Bases do HUB", use_container_width=True):
         for chave in ["df_analise_cache", "base_travada", "col_driver_id_name", "col_driver_name_col", "col_veh_name"]:
             st.session_state.pop(chave, None)
         st.rerun()
 
-st.sidebar.divider()
-st.sidebar.caption("SPX Logistics - Fleet LSP93\nAutor: Pedro Heleno")
+token_ok, _, _ = github_config()
+if token_ok:
+    st.sidebar.caption("☁️ Nuvem Sincronizada (Memória Permanente Ativa)")
+else:
+    st.sidebar.caption("💾 Modo Sessão Local (Configure GITHUB_TOKEN nos Secrets para backup contínuo)")
+
+st.sidebar.caption(f"SPX Logistics - Fleet {HUB_ATUAL}\nCreated by Pedro Heleno")
 
 
 # ==========================================
-# 4. PÁGINA: DASHBOARD DE REENGAJAMENTO, HISTÓRICO & EXPORTAÇÃO
+# 5. PÁGINA: DASHBOARD DE REENGAJAMENTO, HISTÓRICO & EXPORTAÇÃO
 # ==========================================
 def renderizar_pagina_reengajamento_nativa():
-    st.markdown("""
+    st.markdown(f"""
         <div style="background: linear-gradient(135deg, #1E1E1E 0%, #2A0800 100%); border: 1px solid #EE4D2D; box-shadow: 0 0 15px rgba(238, 77, 45, 0.3); padding: 20px; border-radius: 12px; margin-bottom: 25px;">
-            <h2 style='color: #EE4D2D; font-weight: 800; margin: 0;'>📅 Dashboard de Acionamentos, Histórico & Exportação</h2>
-            <p style='color: #AAA; font-size: 0.9rem; margin-top: 5px;'>Acompanhe todos os motoristas acionados, filtre por analista/status, atualize retornos (com data/hora automática) e exporte relatórios.</p>
+            <h2 style='color: #EE4D2D; font-weight: 800; margin: 0;'>📅 Dashboard de Acionamentos & Histórico — {HUB_ATUAL}</h2>
+            <p style='color: #AAA; font-size: 0.9rem; margin-top: 5px;'>Histórico exclusivo do HUB <strong>{HUB_ATUAL}</strong>. Atualize retornos com gravação automática de data/hora e exporte relatórios.</p>
         </div>
     """, unsafe_allow_html=True)
 
-    df_hist = carregar_historico()
+    df_hist = carregar_historico_hub(HUB_ATUAL)
 
     if df_hist.empty:
-        st.warning("📭 Nenhum acionamento registrado até o momento.")
-        st.info("👉 Vá até a aba **📊 Control Tower Churn**, selecione um motorista no campo **Acionar Motorista no WhatsApp** e clique em **Chamar no Whats (Registrar)** para criar o primeiro registro.")
+        st.warning(f"📭 Nenhum acionamento registrado para o HUB {HUB_ATUAL} até o momento.")
+        st.info("👉 Vá até a aba **📊 Control Tower Churn**, selecione um motorista no campo **Acionar Motorista no WhatsApp** e clique em **Chamar no Whats (Registrar)**.")
         return
 
     # 1. KPIs DO DASHBOARD DE ACIONAMENTOS
@@ -352,7 +585,7 @@ def renderizar_pagina_reengajamento_nativa():
     st.divider()
 
     # 3. FILTROS AVANÇADOS DO HISTÓRICO
-    st.subheader("🔍 Filtrar e Editar Acionamentos Arquivados")
+    st.subheader(f"🔍 Filtrar e Editar Acionamentos ({HUB_ATUAL})")
 
     f1, f2, f3, f4 = st.columns([1.5, 1.5, 1.5, 1.5])
     with f1:
@@ -386,11 +619,11 @@ def renderizar_pagina_reengajamento_nativa():
 
     st.caption(f"Exibindo **{len(df_filtrado)}** de **{len(df_hist)}** registros. Dê um duplo clique na coluna **Status** ou **Observação / Tratativa** para editar:")
 
-    # 4. TABELA EDITÁVEL COM GRAVAÇÃO AUTOMÁTICA DE DATA/HORA
     df_editado = st.data_editor(
         df_filtrado,
         column_config={
             "ID Registro": None,
+            "HUB": st.column_config.TextColumn("HUB", disabled=True),
             "Driver ID": st.column_config.TextColumn("Driver ID", disabled=True),
             "Nome": st.column_config.TextColumn("Motorista", disabled=True),
             "Telefone": st.column_config.TextColumn("Telefone", disabled=True),
@@ -420,10 +653,10 @@ def renderizar_pagina_reengajamento_nativa():
         },
         hide_index=True,
         use_container_width=True,
-        key="tabela_edicao_historico_nativa"
+        key=f"tabela_edicao_historico_{HUB_ATUAL}"
     )
 
-    if st.button("💾 SALVAR ALTERAÇÕES (CARIMBA DATA/HORA AUTOMATICAMENTE)", type="primary"):
+    if st.button("💾 SALVAR ALTERAÇÕES NA MEMÓRIA PERMANENTE", type="primary"):
         agora_upd = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         alteracoes = 0
 
@@ -447,9 +680,9 @@ def renderizar_pagina_reengajamento_nativa():
                     df_hist.loc[idx_orig, "Última Atualização"] = agora_upd
                     alteracoes += 1
 
-        salvar_historico(df_hist)
+        salvar_historico_hub(HUB_ATUAL, df_hist)
         if alteracoes > 0:
-            st.toast(f"✅ {alteracoes} registro(s) atualizado(s) às {agora_upd}!", icon="🕒")
+            st.toast(f"✅ {alteracoes} registro(s) salvos na memória do {HUB_ATUAL} às {agora_upd}!", icon="🕒")
             st.rerun()
         else:
             st.info("Nenhuma alteração foi feita na tabela.")
@@ -457,7 +690,7 @@ def renderizar_pagina_reengajamento_nativa():
     st.divider()
 
     # 5. EXPORTAÇÃO DE RELATÓRIO & EXTENSÃO WHATSAPP
-    st.subheader("📥 Exportação de Relatórios & Fila WhatsApp")
+    st.subheader(f"📥 Exportação de Relatórios & Fila WhatsApp ({HUB_ATUAL})")
 
     c_exp1, c_exp2, c_exp3 = st.columns(3)
 
@@ -468,7 +701,7 @@ def renderizar_pagina_reengajamento_nativa():
         st.download_button(
             label=f"📊 Exportar Visão Filtrada ({len(df_rel_filtrado)} reg.)",
             data=csv_filtrado,
-            file_name=f"Relatorio_Filtrado_LSP93_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
+            file_name=f"Relatorio_Filtrado_{HUB_ATUAL}_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
             mime="text/csv",
             type="primary",
             use_container_width=True
@@ -481,7 +714,7 @@ def renderizar_pagina_reengajamento_nativa():
         st.download_button(
             label=f"📑 Exportar Histórico Completo ({len(df_rel_completo)} reg.)",
             data=csv_completo,
-            file_name=f"Relatorio_Completo_LSP93_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
+            file_name=f"Relatorio_Completo_{HUB_ATUAL}_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -490,7 +723,7 @@ def renderizar_pagina_reengajamento_nativa():
     for _, r in df_filtrado.iterrows():
         ph = str(r["Telefone"]).strip()
         if ph and len(ph) >= 10:
-            msg = f"Olá {r['Nome']}! Aqui é {r['Analista Responsável']} da equipe SPX Logistics (LSP93). Entramos em contato sobre: {r['Tipo de Acionamento']}. Podemos conversar?"
+            msg = f"Olá {r['Nome']}! Aqui é {r['Analista Responsável']} da equipe SPX Logistics ({HUB_ATUAL}). Entramos em contato sobre: {r['Tipo de Acionamento']}. Podemos conversar?"
             lista_ext.append(f"{ph};{msg}")
     csv_ext = "Phone;Message\n" + "\n".join(lista_ext)
 
@@ -498,7 +731,7 @@ def renderizar_pagina_reengajamento_nativa():
         st.download_button(
             label=f"📲 Exportar p/ Extensão WhatsApp ({len(lista_ext)})",
             data=csv_ext,
-            file_name=f"Fila_Extensao_Whats_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
+            file_name=f"Fila_Extensao_Whats_{HUB_ATUAL}_{datetime.now().strftime('%d%m%Y_%H%M')}.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -518,11 +751,11 @@ if "Assistente" in st.session_state["pagina_atual"]:
 
 
 # ==========================================
-# 5. JANELA MODAL (POP-UP) DE ACIONAMENTO WHATSAPP
+# 6. JANELA MODAL (POP-UP) DE ACIONAMENTO WHATSAPP
 # ==========================================
 @st.dialog("📲 Registrar Acionamento & Chamar no WhatsApp")
 def modal_acionar_driver(driver_info: dict):
-    st.markdown(f"**Motorista:** `{driver_info['Driver ID']}` — **{driver_info['Nome']}**")
+    st.markdown(f"**Unidade:** `{HUB_ATUAL}` | **Motorista:** `{driver_info['Driver ID']}` — **{driver_info['Nome']}**")
     st.markdown(f"**Veículo:** {driver_info['Veiculo']} | **Inatividade:** {driver_info['Inatividade']}")
     st.divider()
 
@@ -543,9 +776,10 @@ def modal_acionar_driver(driver_info: dict):
         ]
     )
 
+    endereco_padrao = ENDERECOS_HUB.get(HUB_ATUAL, f"HUB SPX Logistics - {HUB_ATUAL}")
     endereco_hub = st.text_input(
         "📍 Endereço do HUB (se aplicável):",
-        value="Av. dos Estados, 7328 - Parque Jaçatuba - Santo André / SP"
+        value=endereco_padrao
     )
 
     c_d1, c_d2 = st.columns(2)
@@ -561,7 +795,7 @@ def modal_acionar_driver(driver_info: dict):
 
     phone = str(driver_info["Telefone"]).strip()
     msg_whatsapp = (
-        f"Olá {driver_info['Nome']}! Aqui é {analista_atual or 'da equipe'} da SPX Logistics (LSP93). "
+        f"Olá {driver_info['Nome']}! Aqui é {analista_atual or 'da equipe'} da SPX Logistics ({HUB_ATUAL}). "
         f"Estamos entrando em contato referente a: *{tipo_acionamento}*.\n"
         f"📅 Data: {dt_reuniao.strftime('%d/%m/%Y')} às {hr_reuniao.strftime('%H:%M')}\n"
         f"📍 Local: {endereco_hub}\n"
@@ -575,6 +809,7 @@ def modal_acionar_driver(driver_info: dict):
         else:
             st.session_state["analista_logado"] = analista_atual.strip()
             registrar_novo_acionamento(
+                hub_code=HUB_ATUAL,
                 driver_id=driver_info["Driver ID"],
                 nome=driver_info["Nome"],
                 telefone=phone,
@@ -587,7 +822,7 @@ def modal_acionar_driver(driver_info: dict):
                 horario=hr_reuniao.strftime("%H:%M"),
                 endereco_hub=endereco_hub
             )
-            st.success(f"Acionamento gravado no histórico às {datetime.now().strftime('%H:%M:%S')}!")
+            st.success(f"Acionamento gravado na memória permanente do {HUB_ATUAL} às {datetime.now().strftime('%H:%M:%S')}!")
             if url_wa:
                 st.link_button("🚀 ABRIR CONVERSA NO WHATSAPP AGORA", url_wa, type="primary", use_container_width=True)
             else:
@@ -595,7 +830,7 @@ def modal_acionar_driver(driver_info: dict):
 
 
 # ==========================================
-# 6. PÁGINA PRINCIPAL: CONTROL TOWER CHURN
+# 7. PÁGINA PRINCIPAL: CONTROL TOWER CHURN
 # ==========================================
 def converter_id_cientifico(val):
     if pd.isna(val) or val == '' or val is None:
@@ -638,9 +873,9 @@ header_html = f'''
     <div>
         <div style="display: flex; align-items: center; gap: 12px;">
             <div style="color: #FFF; font-size: 2.1rem; font-weight: 800; margin: 0;">SPX LOGISTICS - CONTROL TOWER CHURN</div>
-            <span style="background: #00E676; color: #121212; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;">OFICIAL • LSP93</span>
+            <span style="background: #00E676; color: #121212; font-weight: 800; padding: 4px 12px; border-radius: 6px; font-size: 0.85rem;">OFICIAL • {HUB_ATUAL}</span>
         </div>
-        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Gerencial de Monitoramento, Acionamento e Histórico (LSP93)</div>
+        <div style="color: #DDD; font-size: 0.95rem; margin-top: 4px;">Painel Gerencial de Monitoramento, Acionamento e Histórico — Unidade {HUB_ATUAL}</div>
     </div>
     <div>{header_img_html}</div>
 </div>
@@ -649,6 +884,7 @@ st.markdown(header_html, unsafe_allow_html=True)
 
 # ÁREA DE IMPORTAÇÃO
 if not st.session_state.get("base_travada"):
+    st.info(f"📥 Nenhuma base carregada na memória do **{HUB_ATUAL}** no momento (ou você optou por atualizar). Faça o upload abaixo para salvar permanentemente neste HUB:")
     col_up1, col_up2 = st.columns(2)
     with col_up1:
         st.subheader('1. Base de Motoristas')
@@ -663,11 +899,11 @@ if not st.session_state.get("base_travada"):
 
     st.divider()
 
-    if st.button('🚀 GERAR ANÁLISE E TRAVAR PAINEL NA SESSÃO', type="primary", use_container_width=True):
+    if st.button(f'🚀 GERAR ANÁLISE E SALVAR NA MEMÓRIA DO {HUB_ATUAL}', type="primary", use_container_width=True):
         if not arquivo_drivers or not arquivos_rotas:
             st.error('Por favor, faça o upload das bases.')
         else:
-            with st.spinner('Processando inteligência de dados...'):
+            with st.spinner(f'Processando e gravando dados na memória permanente do {HUB_ATUAL}...'):
                 try:
                     df_drivers = pd.read_csv(arquivo_drivers, sep=';', dtype=str, encoding='utf-8')
                 except Exception:
@@ -745,6 +981,9 @@ if not st.session_state.get("base_travada"):
                 df_analise['Dias_Sem_AT_Fmt'] = df_analise['Dias_Sem_Rota'].apply(lambda d: f"{int(d)} dias sem AT" if pd.notna(d) else "Sem Histórico de AT")
                 df_analise['Telefone_Limpo'] = df_analise[col_phone].apply(formatar_whatsapp) if col_phone else ''
                 df_analise = df_analise.sort_values(by='Dias_Sem_Rota', ascending=False, na_position='first')
+
+                # Salva na memória permanente deste HUB
+                salvar_base_hub(HUB_ATUAL, df_analise)
 
                 st.session_state["df_analise_cache"] = df_analise
                 st.session_state["col_driver_id_name"] = col_driver_id
@@ -827,7 +1066,7 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
             df_exibir[col_driver_name].astype(str).str.lower().str.contains(termo)
         ]
 
-    df_hist_atual = carregar_historico()
+    df_hist_atual = carregar_historico_hub(HUB_ATUAL)
     mapa_status_historico = {}
     if not df_hist_atual.empty:
         for _, rh in df_hist_atual.iterrows():
@@ -835,11 +1074,9 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
             if d_id_h not in mapa_status_historico:
                 mapa_status_historico[d_id_h] = f"{rh['Status']} ({rh['Analista Responsável']} - {rh['Data/Hora Acionamento']})"
 
-    # ==========================================
     # SELETOR RÁPIDO PARA ABRIR POP-UP DE ACIONAMENTO
-    # ==========================================
-    st.markdown("### 📲 Acionar Motorista no WhatsApp (Abre Janela de Registro)")
-    st.caption("Escolha o motorista abaixo e clique no botão laranja. Uma janela abrirá para registrar o **Tipo de Acionamento** e o **Analista** antes de abrir o WhatsApp:")
+    st.markdown(f"### 📲 Acionar Motorista no WhatsApp — {HUB_ATUAL}")
+    st.caption("Escolha o motorista abaixo e clique no botão laranja. O acionamento será salvo permanentemente no histórico do seu HUB:")
 
     opcoes_drivers_popup = [
         f"{r[col_driver_id]} - {r[col_driver_name]} ({r.get(col_veh_name, 'N/I')}) | {r['Dias_Sem_AT_Fmt']}"
@@ -867,7 +1104,7 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
                 })
 
     if not df_hist_atual.empty:
-        with st.expander(f"📋 Últimos Acionamentos Registrados ({len(df_hist_atual)} no total) — Clique para ver ou vá ao menu Reengajamento", expanded=True):
+        with st.expander(f"📋 Últimos Acionamentos Registrados no {HUB_ATUAL} ({len(df_hist_atual)} no total)", expanded=True):
             st.dataframe(
                 df_hist_atual[["Driver ID", "Nome", "Analista Responsável", "Tipo de Acionamento", "Status", "Data/Hora Acionamento", "Última Atualização"]].head(5),
                 hide_index=True,
@@ -876,10 +1113,8 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
 
     st.divider()
 
-    # ==========================================
     # TABELA GERENCIAL DE CONSULTA
-    # ==========================================
-    st.markdown(f"### 📋 Tabela Gerencial (`{len(df_exibir)} motoristas`)")
+    st.markdown(f"### 📋 Tabela Gerencial {HUB_ATUAL} (`{len(df_exibir)} motoristas`)")
 
     df_tabela = pd.DataFrame()
     df_tabela["Driver ID"] = df_exibir[col_driver_id].astype(str)
@@ -901,8 +1136,8 @@ if st.session_state.get("base_travada") and "df_analise_cache" in st.session_sta
 img_footer_html = f'<img src="{img_shopito_entregador}" style="height: 55px; border-radius: 8px;">' if img_shopito_entregador else ''
 footer_html = f'''
 <div style="margin-top: 45px; padding: 18px 25px; background: linear-gradient(135deg, rgba(30,30,30,0.8) 0%, rgba(20,20,20,0.9) 100%); border: 1px solid rgba(238, 77, 45, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: space-between;">
-    <div style="display:flex; align-items:center; gap: 12px;">{img_footer_html} <span style="color:#FFF; font-weight:700;">SPX Logistics</span></div>
-    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP93</div>
+    <div style="display:flex; align-items:center; gap: 12px;">{img_footer_html} <span style="color:#FFF; font-weight:700;">SPX Logistics • {HUB_ATUAL}</span></div>
+    <div style="color: #AAA; font-size: 0.95rem; text-align: center;">Created by <strong style="color: #EE4D2D;">Pedro Heleno</strong><br>Fleet - LSP-93</div>
 </div>
 '''
 st.markdown(footer_html, unsafe_allow_html=True)
