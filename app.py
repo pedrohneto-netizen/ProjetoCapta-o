@@ -189,6 +189,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+/* Oculta o botão "Manage app" no canto inferior direito */
+    [data-testid="manage-app-button"],
+    .stAppDeployButton,
+    button[kind="manageApp"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Opcional: Oculta também o menu de 3 pontinhos, Share e ícone do GitHub no topo */
+    #MainMenu,
+    [data-testid="stToolbar"],
+    [data-testid="stHeaderActionElements"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
 
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def get_base64_image_cached(image_filename):
