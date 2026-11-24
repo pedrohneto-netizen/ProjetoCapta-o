@@ -409,6 +409,45 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+</style>
+""", unsafe_allow_html=True)
+
+
+@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
+def get_base64_image_cached(image_filename):
+    base_dir = Path(__file__).resolve().parent
+    possible_paths = [
+        base_dir / image_filename,
+        Path(image_filename),
+        base_dir / "assets" / image_filename,
+        base_dir / "images" / image_filename,
+        base_dir / "img" / image_filename,
+    ]
+    if base_dir.exists():
+        for f in base_dir.iterdir():
+            if f.is_file() and f.name.lower() == image_filename.lower():
+                possible_paths.insert(0, f)
+
+    for path in possible_paths:
+        if path.exists():
+            ext = path.suffix.lower().replace('.', '')
+            mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
+            with open(path, 'rb') as img_file:
+                encoded = base64.b64encode(img_file.read()).decode('utf-8')
+                return f"data:image/{mime};base64,{encoded}"
+    return ''
+
+
+img_logo_oficial = (
+    get_base64_image_cached('Formula 1_2_2.jpg')
+    or get_base64_image_cached('Formula 1_2.jpg')
+    or get_base64_image_cached('formula_1_2_2.jpg')
+)
+img_shopito_entregador = (
+    get_base64_image_cached('GIF-21-entregador.jpg')
+    or get_base64_image_cached('GIF-21-entregador.png')
+)
+
 # ==========================================
 # 3. TELA DE LOGIN POR HUB (ISOLAMENTO DE OPERAÇÃO)
 # ==========================================
