@@ -409,8 +409,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-</style>
-""", unsafe_allow_html=True)
 
 
 @st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
@@ -462,7 +460,7 @@ if not st.session_state["hub_autenticado"]:
         <div class="login-box" style="text-align: center;">
             {logo_login}
             <h2 style="color: #FFF; font-weight: 800; margin: 0;">SPX CONTROL TOWER CHURN</h2>
-            <p style="color: #EE4D2D; font-weight: 700; font-size: 0.95rem; margin-top: 4px;">Acesso Operacional Multi-HUB • Fleet Logistics</p>
+            <p style="color: #EE4D2D; font-weight: 700; font-size: 0.95rem; margin-top: 4px;">Acesso Operacional Multi-HUB | Fleet Logistics</p>
             <p style="color: #BBB; font-size: 0.85rem;">Selecione seu HUB e informe seu nome para carregar a memória e o histórico exclusivo da sua unidade.</p>
         </div>
         """, unsafe_allow_html=True)
@@ -532,7 +530,7 @@ st.sidebar.markdown(f"""
 <div class="sidebar-neon-card">
     <div style="text-align: center; margin-bottom: 6px;">{sidebar_img_html}</div>
     <div class="sidebar-title">🏎️ SPX FLEET CONTROL</div>
-    <div class="sidebar-badge-prod">⚡ OFICIAL • {HUB_ATUAL}</div>
+    <div class="sidebar-badge-prod">⚡ OFICIAL | {HUB_ATUAL}</div>
 </div>
 """, unsafe_allow_html=True)
 
