@@ -267,19 +267,21 @@ for key, default in [
         st.session_state[key] = default
 
 # ==========================================
-# 2. ESTILIZAÇÃO VISUAL (SHOPEE DARK NEON)
+# 2. ESTILIZAÇÃO VISUAL (SHOPEE FULL DARK NEON)
 # ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
     
     :root {
+        color-scheme: dark !important;
         --shopee-orange: #EE4D2D;
         --shopee-neon: #FF5722;
         --shopee-dark-bg: #121212;
+        --shopee-card-bg: #1E1E1E;
     }
 
-    body, .main, .stApp {
+    html, body, .main, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: var(--shopee-dark-bg) !important;
         color: #EEEEEE !important;
         font-family: 'Poppins', sans-serif;
@@ -296,10 +298,62 @@ st.markdown("""
         visibility: hidden !important;
     }
 
+    /* Menu Lateral Dark */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #161616 0%, #0A0A0A 100%) !important;
         border-right: 2px solid var(--shopee-orange) !important;
         box-shadow: 4px 0 20px rgba(238, 77, 45, 0.25) !important;
+    }
+
+    /* Força Full Dark em Inputs, Selectbox, DateInput e Pop-ups (Modais) */
+    input, textarea, select,
+    [data-baseweb="input"],
+    [data-baseweb="base-input"],
+    [data-baseweb="select"] > div,
+    [data-testid="stTextInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTimeInput"] input,
+    [data-testid="stFileUploader"] section {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
+        border-color: #333333 !important;
+    }
+
+    /* Menu suspenso (Dropdowns abertos) e Janela Modal (@st.dialog) */
+    [data-baseweb="popover"],
+    [data-baseweb="menu"],
+    ul[role="listbox"],
+    [data-testid="stDialog"] div[role="dialog"] {
+        background-color: #181818 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #EE4D2D !important;
+    }
+
+    li[role="option"]:hover {
+        background-color: rgba(238, 77, 45, 0.25) !important;
+    }
+
+    /* Botões secundários (Filtros KPI, Reset, Trocar HUB) */
+    button[kind="secondary"] {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
+        border: 1px solid #3A3A3A !important;
+    }
+    button[kind="secondary"]:hover {
+        border-color: #EE4D2D !important;
+        color: #EE4D2D !important;
+    }
+
+    /* Expanders e Alertas */
+    [data-testid="stExpander"] {
+        background-color: #1A1A1A !important;
+        border: 1px solid #2E2E2E !important;
+        border-radius: 10px !important;
+    }
+
+    /* Labels e textos */
+    label, p, span, h1, h2, h3, h4 {
+        color: #EEEEEE !important;
     }
 
     .sidebar-neon-card {
@@ -313,14 +367,14 @@ st.markdown("""
     }
 
     .sidebar-title {
-        color: #FFFFFF;
+        color: #FFFFFF !important;
         font-weight: 800;
         font-size: 1.05rem;
     }
 
     .sidebar-badge-prod {
         background: linear-gradient(90deg, #00C853 0%, #00E676 100%);
-        color: #121212;
+        color: #121212 !important;
         font-size: 0.72rem;
         font-weight: 800;
         padding: 3px 10px;
@@ -355,43 +409,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-
-@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
-def get_base64_image_cached(image_filename):
-    base_dir = Path(__file__).resolve().parent
-    possible_paths = [
-        base_dir / image_filename,
-        Path(image_filename),
-        base_dir / "assets" / image_filename,
-        base_dir / "images" / image_filename,
-        base_dir / "img" / image_filename,
-    ]
-    if base_dir.exists():
-        for f in base_dir.iterdir():
-            if f.is_file() and f.name.lower() == image_filename.lower():
-                possible_paths.insert(0, f)
-
-    for path in possible_paths:
-        if path.exists():
-            ext = path.suffix.lower().replace('.', '')
-            mime = 'gif' if ext == 'gif' else ('png' if ext == 'png' else 'jpeg')
-            with open(path, 'rb') as img_file:
-                encoded = base64.b64encode(img_file.read()).decode('utf-8')
-                return f"data:image/{mime};base64,{encoded}"
-    return ''
-
-
-img_logo_oficial = (
-    get_base64_image_cached('Formula 1_2_2.jpg')
-    or get_base64_image_cached('Formula 1_2.jpg')
-    or get_base64_image_cached('formula_1_2_2.jpg')
-)
-img_shopito_entregador = (
-    get_base64_image_cached('GIF-21-entregador.jpg')
-    or get_base64_image_cached('GIF-21-entregador.png')
-)
-
 # ==========================================
 # 3. TELA DE LOGIN POR HUB (ISOLAMENTO DE OPERAÇÃO)
 # ==========================================
